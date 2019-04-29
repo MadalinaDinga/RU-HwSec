@@ -15,7 +15,8 @@ CAP_FILES=bin/cap
 APPLET_PACKAGE=applet
 APPLET_MAIN_CLASS=CryptoApplet
 TERMINAL_PACKAGE=terminal
-TERMINAL_MAIN_CLASS=CryptoTerminal
+TERMINAL_MAIN_CLASS=PBE
+#CryptoTerminal
 
 
 convert-applet: compile-applet
@@ -37,7 +38,7 @@ compile-applet:
 
 run-terminal: terminal
 	# Invoke main class
-	java -classpath bin/ ${TERMINAL_PACKAGE}.${TERMINAL_MAIN_CLASS}
+	java -classpath bin/:lib/bcprov-jdk15on-161.jar ${TERMINAL_PACKAGE}.${TERMINAL_MAIN_CLASS}
 
 terminal: compile-terminal
 
@@ -45,7 +46,7 @@ compile-terminal:
 	# Find all source files
 	find src/${TERMINAL_PACKAGE}/ -name "*.java" > terminal-sources.txt
 	# Compile source files
-	javac -d bin/ -cp ${JC_PATH} @terminal-sources.txt 
+	javac -classpath lib/bcprov-jdk15on-161.jar:${JC_PATH} -d bin/ @terminal-sources.txt 
 	# Remove generated auxiliary file
 	rm terminal-sources.txt
 

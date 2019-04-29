@@ -13,6 +13,8 @@ import java.security.interfaces.*;
 
 import javax.smartcardio.*;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 /**
  * Sample terminal for the Crypto applet.
  * 
