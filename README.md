@@ -5,6 +5,9 @@
 - To compile and update applet use
 	`make update-applet`
 
+- To remove all output files from building use
+	`make clean`
+
 ## Makefile
 Make sure the following variables are set correctly for your project:
 - `APPLET_PACKAGE=applet`
