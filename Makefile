@@ -1,10 +1,10 @@
 # Definitions
-JC_HOME=../java_card_kit-2_2_1
+JC_HOME=lib/java_card_kit-2_2_1
 
 JC_PATH=${JC_HOME}/lib/apdutool.jar:${JC_HOME}/lib/apduio.jar:${JC_HOME}/lib/converter.jar:${JC_HOME}/lib/jcwde.jar:${JC_HOME}/lib/scriptgen.jar:${JC_HOME}/lib/offcardverifier.jar:${JC_HOME}/lib/api.jar:${JC_HOME}/lib/installer.jar:${JC_HOME}/lib/capdump.jar:${JC_HOME}/samples/classes:${CLASSPATH}
 
 CONVERTER=java -Djc.home=${JC_HOME} -classpath ${JC_PATH}:CardApplet/bin com.sun.javacard.converter.Converter
-GP=java -jar ../gp/gp.jar
+GP=java -jar lib/gp/gp.jar
 
 
 # Variables for reusablity
