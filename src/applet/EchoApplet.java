@@ -32,7 +32,7 @@ public class EchoApplet extends Applet implements ISO7816 {
 
         switch(instructionByte) {
             case INS_ECHO:
-                short len = readBuffer(apdu, tmp, (short) 0, (short) 0);
+                short len = readBuffer(apdu, tmp, (short) 0);
                 Util.arrayCopy(tmp, (byte) 0, buffer, ISO7816.OFFSET_CDATA, len);
                 apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, len);
                 break;
@@ -55,22 +55,23 @@ public class EchoApplet extends Applet implements ISO7816 {
     * @param offset offset into the destination byte array.
     * @param length number of bytes to copy.
     */
-   private short readBuffer(APDU apdu, byte[] dest, short offset,
-   short length) {
-        // Buffer of APDU
-        byte[] buffer = apdu.getBuffer();
-        // incoming apdu command length
-        short bytesLeft = (short) (buffer[OFFSET_LC] & 0x00FF);
-        // Read number of bytes 
-        short readCount = apdu.setIncomingAndReceive();
-        short len = readCount;
-        while ( bytesLeft > 0){
-            // process bytes in buffer[5] to buffer[readCount+4];
-            bytesLeft -= readCount;
-            readCount = apdu.receiveBytes ( OFFSET_CDATA );
-            Util.arrayCopy(buffer, OFFSET_CDATA, dest, offset,readCount);
-            }
-        return len;
+   private short readBuffer(APDU apdu, byte[] dest, short offset) {
+    byte[] buf = apdu.getBuffer();
+    short readCount = apdu.setIncomingAndReceive();
+    short i = 0;
+    Util.arrayCopy(buf,OFFSET_CDATA,dest,offset,readCount);
+
+    short length = (short) (buf[ISO7816.OFFSET_LC] & 0xff);
+
+    while ((short)(i + readCount) < length) {
+       i += readCount;
+       offset += readCount;
+       readCount = (short)apdu.receiveBytes(OFFSET_CDATA);
+       Util.arrayCopy(buf,OFFSET_CDATA,dest,offset,readCount);
     }
+
+    return length;
+
+ }
 
 }

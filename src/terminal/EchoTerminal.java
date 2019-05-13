@@ -56,8 +56,18 @@ public class EchoTerminal {
                                 byte[] data = { 0x48, 0x65, 0x6c, 0x6c, 0x6f };
                                 CommandAPDU capdu = new CommandAPDU((byte) 0xCC, (byte) 0x02, 0, 0, data, data.length);
                                 System.out.println("Sent: " + capdu.toString());
+                                System.out.println("Data: " + new String(capdu.getBytes()));
+                                for(byte b : capdu.getBytes()) {
+                                    System.out.print((int) (b & 0xFF) + " ");
+                                }
+                                System.out.println();
                                 ResponseAPDU rapdu = applet.transmit(capdu);
                                 System.out.println("Got response: " + rapdu.toString());
+                                System.out.println("Got data: " + new String(rapdu.getBytes()));
+                                for(byte b : rapdu.getBytes()) {
+                                    System.out.print((int) (b & 0xFF) + " ");
+                                }
+                                System.out.println();
                             } catch (SecurityException e) {
                                 System.err.println("Caller does not have required permission");
                             } catch (IllegalStateException e) {
