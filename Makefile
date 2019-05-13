@@ -13,9 +13,9 @@ AID=${P_AID}:0xAB
 
 CAP_FILES=bin/cap
 APPLET_PACKAGE=applet
-APPLET_MAIN_CLASS=CryptoApplet
+APPLET_MAIN_CLASS=EchoApplet
 TERMINAL_PACKAGE=terminal
-TERMINAL_MAIN_CLASS=PBE
+TERMINAL_MAIN_CLASS=EchoTerminal
 #CryptoTerminal
 
 
@@ -54,6 +54,7 @@ clean:
 	rm -rf bin/${APPLET_PACKAGE}
 	rm -rf bin/cap/*
 	rm -rf bin/${TERMINAL_PACKAGE}
+	find bin/ -maxdepth 1 -type f -delete
 
 uninstall:
 	${GP} --delete ${P_AID}
