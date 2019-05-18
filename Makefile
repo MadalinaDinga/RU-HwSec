@@ -1,6 +1,5 @@
 # Definitions
-# JC_HOME=lib/java_card_kit-2_2_1
-JC_HOME=lib/java_card_kit-2_2_2
+JC_HOME=lib/java_card_kit-2_2_1
 
 JC_PATH=${JC_HOME}/lib/apdutool.jar:${JC_HOME}/lib/apduio.jar:${JC_HOME}/lib/converter.jar:${JC_HOME}/lib/jcwde.jar:${JC_HOME}/lib/scriptgen.jar:${JC_HOME}/lib/offcardverifier.jar:${JC_HOME}/lib/api.jar:${JC_HOME}/lib/installer.jar:${JC_HOME}/lib/capdump.jar:${JC_HOME}/samples/classes:${CLASSPATH}
 
@@ -14,9 +13,12 @@ AID=${P_AID}:0xAB
 
 CAP_FILES=bin/cap
 APPLET_PACKAGE=applet
-APPLET_MAIN_CLASS=EchoApplet
+APPLET_MAIN_CLASS=PurseApplet
 TERMINAL_PACKAGE=terminal
-TERMINAL_MAIN_CLASS=EchoTerminal
+TERMINAL_MAIN_CLASS_POS=PurseTerminal
+TERMINAL_MAIN_CLASS_RELOAD=PurseReloadTerminal
+TERMINAL_MAIN_CLASS_ISSUER=PurseInitializationTerminal
+COMMON_PACKAGE = common
 #CryptoTerminal
 
 
@@ -33,19 +35,28 @@ update-applet: convert-applet
 compile-applet: 
 	#Compiling 
 	find src/${APPLET_PACKAGE}/ -name "*.java" > applet-sources.txt
+	find src/${COMMON_PACKAGE}/ -name "*.java" >> applet-sources.txt
 	javac -source 1.3 -target 1.1 -d bin/ -cp ${JC_PATH} @applet-sources.txt
 	rm applet-sources.txt
 
-
-run-terminal: terminal
+run-issue-terminal: terminal
 	# Invoke main class
-	java -classpath bin/:lib/bcprov-jdk15on-161.jar ${TERMINAL_PACKAGE}.${TERMINAL_MAIN_CLASS}
+	java -classpath bin/:lib/bcprov-jdk15on-161.jar ${TERMINAL_PACKAGE}.${TERMINAL_MAIN_CLASS_ISSUER}
+
+run-reload-terminal: terminal
+	# Invoke main class of reload terminal
+	java -classpath bin/:lib/bcprov-djk15on-161.jar ${TERMINAL_PACKAGE}.${TERMINAL_MAIN_CLASS_RELOAD}
+
+run-pos-terminal:
+	# Invoke main class POS terminal
+	java -classpath bin/:lib/bcprov-djk15on-161.jar ${TERMINAL_PACKAGE}.${TERMINAL_MAIN_CLASS_POS}	
 
 terminal: compile-terminal
 
 compile-terminal: 
 	# Find all source files
 	find src/${TERMINAL_PACKAGE}/ -name "*.java" > terminal-sources.txt
+	find src/${COMMON_PACKAGE}/ -name "*.java" >> terminal-sources.txt
 	# Compile source files
 	javac -classpath lib/bcprov-jdk15on-161.jar:${JC_PATH} -d bin/ @terminal-sources.txt 
 	# Remove generated auxiliary file
