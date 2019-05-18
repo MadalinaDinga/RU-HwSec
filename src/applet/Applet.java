@@ -1,5 +1,7 @@
 package applet;
 
+import common.Constants.*;
+
 import javacard.framework.*;
 import javacard.security.*;
 import javacard.security.KeyPair.*;
@@ -8,14 +10,6 @@ import javacard.security.Signature;
 
 
 public class EchoApplet extends Applet implements ISO7816 {
-    
-    /** Instruction code for echoing */
-    private static final byte INS_ECHO = (byte) 0x02;
-    private static final byte INS_GIVE_KEY_EXP = (byte) 0x03;
-    private static final byte INS_GIVE_KEY_MOD = (byte) 0x04;
-    private static final byte INS_SIGN = (byte) 0x6;
-
-    private static final byte INS_GIVE_KEY_PUB_EXP = (byte) 0x05;
 
     private static KeyPair kp;
     private static PublicKey masterVerifyKey;
@@ -25,6 +19,13 @@ public class EchoApplet extends Applet implements ISO7816 {
 
     /** Buffer in RAM */
     private static byte[] tmp;
+    private static byte[] keyCertificate;
+
+    /** The state of the application, stored in EEPROM */
+    private byte persistentState;
+    private static final byte PERSONALIZABLE = 0x00;
+
+    private byte[] transientState;
 
     public EchoApplet() {
         tmp = JCSystem.makeTransientByteArray((short)256,JCSystem.CLEAR_ON_RESET);
@@ -50,6 +51,23 @@ public class EchoApplet extends Applet implements ISO7816 {
         if (selectingApplet()) {
             return;
         }
+
+
+        switch(instructionByte) {
+            case INS_PUBLIC_EXPONENT:
+                break;
+            
+            case INS_PUBLIC_MODULUS:
+                break;
+
+            case INS_KEY_CERTIFICATE:
+                break;
+
+            default:
+                ISOException.throwIt(SW_INS_NOT_SUPPORTED);
+        }
+
+
 
         switch(instructionByte) {
             case INS_ECHO:
