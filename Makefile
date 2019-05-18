@@ -39,7 +39,7 @@ compile-applet:
 	javac -source 1.3 -target 1.1 -d bin/ -cp ${JC_PATH} @applet-sources.txt
 	rm applet-sources.txt
 
-run-issue-terminal: terminal
+run-issuer-terminal: terminal
 	# Invoke main class
 	java -classpath bin/:lib/bcprov-jdk15on-161.jar ${TERMINAL_PACKAGE}.${TERMINAL_MAIN_CLASS_ISSUER}
 
