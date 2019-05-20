@@ -15,11 +15,10 @@ CAP_FILES=bin/cap
 APPLET_PACKAGE=applet
 APPLET_MAIN_CLASS=PurseApplet
 TERMINAL_PACKAGE=terminal
-TERMINAL_MAIN_CLASS_POS=PurseTerminal
-TERMINAL_MAIN_CLASS_RELOAD=PurseReloadTerminal
+TERMINAL_MAIN_CLASS_POS=PoSPurseTerminal
+TERMINAL_MAIN_CLASS_RELOAD=ReloadPurseTerminal
 TERMINAL_MAIN_CLASS_ISSUER=PurseInitializationTerminal
 COMMON_PACKAGE = common
-#CryptoTerminal
 
 
 convert-applet: compile-applet
