@@ -17,11 +17,12 @@ public class PurseApplet extends Applet implements ISO7816 {
      *        KEY MATERIAL
      */
 
-    /** Own key pair */
+    /** Own signature key pair */
     private KeyPair kp;
     private RSAPublicKey pubKey;
     private RSAPrivateKey privKey;
-    /** EEPROM for holding own key certificate */
+    
+    /** EEPROM for holding own key certificate for signing key*/
     private byte[] keyCertificate;
 
     /** Public key for verifying signatures within the PKI. */
@@ -44,14 +45,17 @@ public class PurseApplet extends Applet implements ISO7816 {
     private static final byte STATE_ISSUED = 1;
     /** The balance on the card stored in EEPROM */
     private short balance;
-    /** The transient state of the application, stored in RAM. */
+    /** The transient state of the application, stored in RAM. First byte is
+     * currently executing protocol, second byte is at which step you are in 
+     * the protocol. The third byte is the step in the step. 
+     */
     private byte[] transientState;
 
     public PurseApplet() {
         // Create buffer
         tmp = JCSystem.makeTransientByteArray((short)256,JCSystem.CLEAR_ON_RESET);
         // Create state
-        transientState = JCSystem.makeTransientByteArray((short) 1, JCSystem.CLEAR_ON_RESET);
+        transientState = JCSystem.makeTransientByteArray((short) 3, JCSystem.CLEAR_ON_RESET);
         persistentState = STATE_INIT;
         balance = 0;
         // Create crypto primitives
@@ -59,7 +63,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         signature = Signature.getInstance(Signature.ALG_RSA_SHA_PKCS1, false);
         
         // Creating keys
-        kp = new KeyPair(KeyPair.ALG_RSA, KeyBuilder.LENGTH_RSA_1024);
+        kp = new KeyPair(KeyPair.ALG_RSA, KeyBuilder.LENGTH_RSA_1024); // 1024 bits for convenience
         kp.genKeyPair();
         privKey = (RSAPrivateKey) kp.getPrivate();
         pubKey = (RSAPublicKey) kp.getPublic();
