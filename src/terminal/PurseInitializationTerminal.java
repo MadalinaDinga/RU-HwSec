@@ -77,7 +77,8 @@ public class PurseInitializationTerminal {
             KeyFactory factory = KeyFactory.getInstance("RSA");
             PublicKey pub = factory.generatePublic(spec);
 
-            capdu = new CommandAPDU((byte) 0xCC, Constants.INS_KEY_CERTIFICATE, 0, 0, null, 0);
+            // capdu = new CommandAPDU((byte) 0xCC, Constants.INS_KEY_CERTIFICATE, 0, 0, null, 0);
+            capdu = new CommandAPDU((byte) 0x01, Constants.INS_KEY_CERTIFICATE, 0, 0, null, 0);
             rapdu = applet.transmit(capdu);
             byte[] certificate = rapdu.getData();
 
@@ -181,6 +182,18 @@ public class PurseInitializationTerminal {
             rapdu = applet.transmit(capdu);
             System.out.println(rapdu.toString());
 
+            System.out.println("Issuing card.");
+
+            capdu = new CommandAPDU((byte) 0xCC, INS_ISSUE, 0, 0, null, 0);
+            rapdu = applet.transmit(capdu);
+            System.out.println("Verifying signature on card. ");
+            capdu = new CommandAPDU((byte) 0xCC, INS_VERIFY, 0, 0, signature, 0);
+            rapdu = applet.transmit(capdu);
+            System.out.println(rapdu.toString());
+
+
+
+
         } catch (InvalidKeySpecException ex) {
             System.err.println("Failed to construct key from given modulus and exponent");
         } catch (NoSuchAlgorithmException ex) {
@@ -191,10 +204,7 @@ public class PurseInitializationTerminal {
             System.err.println("Failed to call update on Signature obj");
         }   
 
-        System.out.println("Issuing card.");
-
-        capdu = new CommandAPDU((byte) 0xCC, INS_ISSUE, 0, 0, null, 0);
-        rapdu = applet.transmit(capdu);
+        
         
 
     }

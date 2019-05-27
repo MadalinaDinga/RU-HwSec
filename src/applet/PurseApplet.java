@@ -1,5 +1,7 @@
 package applet;
 
+import javax.naming.AuthenticationException;
+
 import common.Constants;
 
 import javacard.framework.*;
@@ -35,7 +37,7 @@ public class PurseApplet extends Applet implements ISO7816 {
     private RSAPublicKey otherKey;
     
     /*
-     *        STATE 
+     *        STATE
      */
 
     /** The persistent state of the application, stored in EEPROM */
@@ -46,12 +48,22 @@ public class PurseApplet extends Applet implements ISO7816 {
     private short balance;
     /** The transient state of the application, stored in RAM. */
     private byte[] transientState;
+    private static final short STATE_INDEX_CURRENT_PROTOCOL = 0;
+    private static final short STATE_INDEX_STEP = 1;
+    private static final short STATE_INDEX_PARTIAL_STEP = 2;
+
+    private static final byte NO_PROTOCOL = (byte) 0;
+    private static final byte AUTHENTICATING = (byte) 1;
+    private static final byte AUTHENTICATED = (byte) 2;
+    private static final byte RELOAD = (byte) 3;
+    private static final byte PAYMENT = (byte) 4;
 
     public PurseApplet() {
         // Create buffer
-        tmp = JCSystem.makeTransientByteArray((short)256,JCSystem.CLEAR_ON_RESET);
+        // tmp = JCSystem.makeTransientByteArray((short)256,JCSystem.CLEAR_ON_DESELECT);
+        tmp = JCSystem.makeTransientByteArray((short) 512, JCSystem.CLEAR_ON_DESELECT);
         // Create state
-        transientState = JCSystem.makeTransientByteArray((short) 1, JCSystem.CLEAR_ON_RESET);
+        transientState = JCSystem.makeTransientByteArray((short) 1, JCSystem.CLEAR_ON_DESELECT);
         persistentState = STATE_INIT;
         balance = 0;
         // Create crypto primitives
@@ -64,9 +76,9 @@ public class PurseApplet extends Applet implements ISO7816 {
         privKey = (RSAPrivateKey) kp.getPrivate();
         pubKey = (RSAPublicKey) kp.getPublic();
 
-        otherKey = (RSAPublicKey) kp.getPublic();
+        otherKey = (RSAPublicKey) KeyBuilder.buildKey(KeyBuilder.TYPE_RSA_PUBLIC, KeyBuilder.LENGTH_RSA_1024, false); // TODO: Research KeyEncryption interface
         otherKey.clearKey();
-        masterVerifyKey = (RSAPublicKey) kp.getPublic();
+        masterVerifyKey = (RSAPublicKey) KeyBuilder.buildKey(KeyBuilder.TYPE_RSA_PUBLIC, KeyBuilder.LENGTH_RSA_1024, false); // TODO: Research KeyEncryption interface
         masterVerifyKey.clearKey();
         // Reserve room for certificate
         keyCertificate = new byte[Constants.CERTIFICATE_LENGTH];
@@ -85,6 +97,7 @@ public class PurseApplet extends Applet implements ISO7816 {
 
         /* Ignore the APDU that selects this applet... */
         if (selectingApplet()) {
+            clearTransientState();
             return;
         }
 
@@ -111,25 +124,82 @@ public class PurseApplet extends Applet implements ISO7816 {
                 }
             break;
             case STATE_ISSUED:
-                switch(instructionByte) {
-                    case Constants.INS_PUBLIC_EXPONENT:
-                        send_own_public_exponent(apdu);
-                        break;
-                    
-                    case Constants.INS_PUBLIC_MODULUS:
-                        send_own_public_modulus(apdu);
-                        break;
 
-                    case Constants.INS_KEY_CERTIFICATE:
-                        send_own_public_key_certificate(apdu);
-                        break;
+                switch(transientState[STATE_INDEX_CURRENT_PROTOCOL]) {
+                    case NO_PROTOCOL:
+                        switch(instructionByte) {
+                            case Constants.START_AUTHENTICATION_PROTOCOL:
+                                transientState[1] = AUTHENTICATING;
+                                transientState[2] = 0;
+                                transientState[3] = 0;
+                                break;
+                            case Constants.START_RELOAD_PROTOCOL:
+                                if (isAuthenticated()) {
+                                    transientState[1] = RELOAD;
+                                    transientState[2] = 0;
+                                    transientState[3] = 0;
+                                } else {
+                                    ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
+                                }
+                                break;
+                            case Constants.START_PAYMENT_PROTOCOL:
+                                if (isAuthenticated()) {
+                                    transientState[1] = PAYMENT;
+                                    transientState[2] = 0;
+                                    transientState[3] = 0;
+                                } else {
+                                    ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
+                                }
+                                break;
 
+                            default:
+                                ISOException.throwIt(SW_INS_NOT_SUPPORTED);
+                        }
+                        break;
+                    case AUTHENTICATING:
+                        switch(transientState[STATE_INDEX_STEP]) {
+                            case 0:
+                                // Receive public modulus
+                                len = readBuffer(apdu, tmp, (short) 0);
+                                otherKey.setModulus(tmp,(short) 0, len);
+                                // Send public modulus
+                                send_own_public_modulus(apdu);
+                                transientState[STATE_INDEX_STEP]++;
+                                break;
+                            case 1:
+                                // Receive public exponent
+                                len = readBuffer(apdu, tmp, (short) 0);
+                                otherKey.setExponent(tmp, (short) 0, len);
+                                // Send own exponent
+                                send_own_public_exponent(apdu);
+                                transientState[STATE_INDEX_STEP]++;
+                                break;
+                            case 2:
+                                if (verifyCertificate(apdu)) {
+                                    send_own_public_key_certificate(apdu);
+                                } else {
+                                    clearTransientState();
+                                    ISOException.throwIt(Constants.SW_CERTIFICATE_CHECK_FAILED);
+                                }
+                                
+
+                        }
+                        break;
+                    case RELOAD:
+
+                        break;
+                    case PAYMENT:
+
+                        break;
                     default:
-                        ISOException.throwIt(SW_INS_NOT_SUPPORTED);
+                        ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
                 }
-            break;
-
+                break;
         }
+    }
+
+    private boolean isAuthenticated() {
+        return transientState[1] == AUTHENTICATED;
     }
 
     private void send_own_public_key_certificate(APDU apdu) {
@@ -181,6 +251,37 @@ public class PurseApplet extends Applet implements ISO7816 {
             // store exponent
             masterVerifyKey.setExponent(tmp, (short) 0, len);
         }
+    }
+
+    /**
+     * Verifies if the certificate in the <code>apdu</code> buffer is a valid
+     * signature on the current value of <code>otherKey</code>.
+     * @param apdu
+     * @return true if certificate is valid, false otherwise.
+     * @throws SW_DATA_INVALID if signature is incorrect.
+     */
+    private boolean verifyCertificate(APDU apdu) {
+        signature.init(masterVerifyKey, Signature.MODE_VERIFY);
+        short mLen = otherKey.getModulus(tmp, (short) 0);
+        short tLen = otherKey.getExponent(tmp, mLen);
+        // short mLen = pubKey.getModulus(tmp, (short) 0);
+        // short tLen = pubKey.getExponent(tmp, mLen);
+        short len = readBuffer(apdu, tmp, (short) (mLen + tLen));
+
+        if (signature.verify(tmp, (short) 0, (short) (mLen + tLen), tmp, (short) (mLen + tLen), len)) {
+            return true;
+        } else {
+            ISOException.throwIt(SW_DATA_INVALID);
+            return false;
+        }
+    }
+
+    /**
+     * Resets the transient state as if no communication has happened yet.
+     */
+    private void clearTransientState() {
+        otherKey.clearKey();
+        transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
     }
 
     /**

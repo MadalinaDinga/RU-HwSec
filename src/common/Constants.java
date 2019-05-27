@@ -14,8 +14,18 @@ public class Constants {
     public static final byte INS_ISSUE = (byte) 0x07;
 
     public static final byte INS_KEY_CERTIFICATE = (byte) 0x08;
-
+    public static final byte INS_VERIFY = (byte) 0x09;
 	public static final short CERTIFICATE_LENGTH = 128;
+
+
+	public static final byte START_AUTHENTICATION_PROTOCOL = 0x0a;
+	public static final byte START_RELOAD_PROTOCOL = 0x0b;
+    public static final byte START_PAYMENT_PROTOCOL = 0x0c;
+    
+    /*
+     *          REASONS
+     */
+    public static final short SW_CERTIFICATE_CHECK_FAILED = (short) 0x900A;
 
 
 
