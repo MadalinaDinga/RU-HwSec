@@ -15,8 +15,10 @@ public class Constants {
 
     public static final byte INS_KEY_CERTIFICATE = (byte) 0x08;
     public static final byte INS_VERIFY = (byte) 0x09;
-	public static final short CERTIFICATE_LENGTH = 128;
-
+    public static final short CERTIFICATE_LENGTH = 128;
+    
+    /** Number of bytes to use a challenge */
+    public static final short CHALLENGE_LENGTH = 2;
 
 	public static final byte START_AUTHENTICATION_PROTOCOL = 0x0a;
 	public static final byte START_RELOAD_PROTOCOL = 0x0b;
@@ -26,6 +28,7 @@ public class Constants {
      *          REASONS
      */
     public static final short SW_CERTIFICATE_CHECK_FAILED = (short) 0x900A;
+    public static final short SW_CHALLENGE_FAILED = (short) 0x900B;
 
 
 

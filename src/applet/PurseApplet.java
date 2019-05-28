@@ -1,7 +1,5 @@
 package applet;
 
-import javax.naming.AuthenticationException;
-
 import common.Constants;
 
 import javacard.framework.*;
@@ -36,6 +34,8 @@ public class PurseApplet extends Applet implements ISO7816 {
     /** For holding key of other party. */
     private RSAPublicKey otherKey;
     
+    private RandomData random;
+
     /*
      *        STATE
      */
@@ -51,25 +51,27 @@ public class PurseApplet extends Applet implements ISO7816 {
     private static final short STATE_INDEX_CURRENT_PROTOCOL = 0;
     private static final short STATE_INDEX_STEP = 1;
     private static final short STATE_INDEX_PARTIAL_STEP = 2;
+    private static final short STATE_INDEX_AUTHENTICATION_STATUS = 3;
 
     private static final byte NO_PROTOCOL = (byte) 0;
     private static final byte AUTHENTICATING = (byte) 1;
     private static final byte AUTHENTICATED = (byte) 2;
-    private static final byte RELOAD = (byte) 3;
-    private static final byte PAYMENT = (byte) 4;
+    private static final byte NOT_AUTHENTICATED = (byte) 3;
+    private static final byte RELOAD = (byte) 4;
+    private static final byte PAYMENT = (byte) 5;
 
     public PurseApplet() {
         // Create buffer
         // tmp = JCSystem.makeTransientByteArray((short)256,JCSystem.CLEAR_ON_DESELECT);
         tmp = JCSystem.makeTransientByteArray((short) 512, JCSystem.CLEAR_ON_DESELECT);
         // Create state
-        transientState = JCSystem.makeTransientByteArray((short) 1, JCSystem.CLEAR_ON_DESELECT);
+        transientState = JCSystem.makeTransientByteArray((short) 4, JCSystem.CLEAR_ON_DESELECT);
         persistentState = STATE_INIT;
         balance = 0;
         // Create crypto primitives
         cipher = Cipher.getInstance(Cipher.ALG_RSA_PKCS1, false);
         signature = Signature.getInstance(Signature.ALG_RSA_SHA_PKCS1, false);
-        
+        random = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
         // Creating keys
         kp = new KeyPair(KeyPair.ALG_RSA, KeyBuilder.LENGTH_RSA_1024);
         kp.genKeyPair();
@@ -92,7 +94,6 @@ public class PurseApplet extends Applet implements ISO7816 {
         byte[] buffer = apdu.getBuffer();
         byte instructionByte = buffer[OFFSET_INS];
         
-        RSAPrivateKey privK;
         short len;
 
         /* Ignore the APDU that selects this applet... */
@@ -124,29 +125,28 @@ public class PurseApplet extends Applet implements ISO7816 {
                 }
             break;
             case STATE_ISSUED:
-
                 switch(transientState[STATE_INDEX_CURRENT_PROTOCOL]) {
                     case NO_PROTOCOL:
                         switch(instructionByte) {
                             case Constants.START_AUTHENTICATION_PROTOCOL:
-                                transientState[1] = AUTHENTICATING;
-                                transientState[2] = 0;
-                                transientState[3] = 0;
+                                transientState[STATE_INDEX_CURRENT_PROTOCOL] = AUTHENTICATING;
+                                transientState[STATE_INDEX_STEP] = 0;
+                                transientState[STATE_INDEX_PARTIAL_STEP] = 0;
                                 break;
                             case Constants.START_RELOAD_PROTOCOL:
                                 if (isAuthenticated()) {
-                                    transientState[1] = RELOAD;
-                                    transientState[2] = 0;
-                                    transientState[3] = 0;
+                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = RELOAD;
+                                    transientState[STATE_INDEX_STEP] = 0;
+                                    transientState[STATE_INDEX_PARTIAL_STEP] = 0;
                                 } else {
                                     ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
                                 }
                                 break;
                             case Constants.START_PAYMENT_PROTOCOL:
                                 if (isAuthenticated()) {
-                                    transientState[1] = PAYMENT;
-                                    transientState[2] = 0;
-                                    transientState[3] = 0;
+                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = PAYMENT;
+                                    transientState[STATE_INDEX_STEP] = 0;
+                                    transientState[STATE_INDEX_PARTIAL_STEP] = 0;
                                 } else {
                                     ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
                                 }
@@ -155,6 +155,10 @@ public class PurseApplet extends Applet implements ISO7816 {
                             default:
                                 ISOException.throwIt(SW_INS_NOT_SUPPORTED);
                         }
+                        apdu.setOutgoingAndSend((short) 0, (short) 0);
+                        break;
+                    default:
+                        ISOException.throwIt(SW_INS_NOT_SUPPORTED);
                         break;
                     case AUTHENTICATING:
                         switch(transientState[STATE_INDEX_STEP]) {
@@ -177,12 +181,46 @@ public class PurseApplet extends Applet implements ISO7816 {
                             case 2:
                                 if (verifyCertificate(apdu)) {
                                     send_own_public_key_certificate(apdu);
+                                    transientState[STATE_INDEX_STEP]++;
                                 } else {
                                     clearTransientState();
                                     ISOException.throwIt(Constants.SW_CERTIFICATE_CHECK_FAILED);
                                 }
-                                
-
+                                break;
+                            case 3:
+                                /* Expected is an encrypted challenge, we must respond with the unencrypted value */
+                                len = readBuffer(apdu, tmp, (short) 0);
+                                cipher.init(privKey, Cipher.MODE_DECRYPT);
+                                try {
+                                    len = cipher.doFinal(tmp, (short) 0, len, apdu.getBuffer(), (short) 0);
+                                    transientState[STATE_INDEX_STEP]++;
+                                    apdu.setOutgoingAndSend((short) 0, len);
+                                } catch (CryptoException e) {
+                                    ISOException.throwIt((short) 0x04);
+                                }
+                                    break;
+                            case 4:
+                                /* Don't expect any data, return a challenge */
+                                apdu.setIncomingAndReceive();
+                                random.generateData(tmp, (short) 0, Constants.CHALLENGE_LENGTH);
+                                cipher.init(otherKey, Cipher.MODE_ENCRYPT);
+                                len = cipher.doFinal(tmp, (short) 0, Constants.CHALLENGE_LENGTH, apdu.getBuffer(), (short) 0);
+                                transientState[STATE_INDEX_STEP]++;
+                                apdu.setOutgoingAndSend((short) 0, len);
+                                break;
+                            case 5:
+                                /* Expected is the original value. */
+                                len = readBuffer(apdu, tmp, Constants.CHALLENGE_LENGTH);
+                                if ((byte) 0x00 == Util.arrayCompare(tmp, (short) 0, tmp, Constants.CHALLENGE_LENGTH, Constants.CHALLENGE_LENGTH))  {
+                                    transientState[STATE_INDEX_STEP]++;
+                                    apdu.setOutgoingAndSend((short) 0, (short) 0);
+                                    setAuthenticated(true);
+                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
+                                } else {
+                                    clearTransientState();
+                                    ISOException.throwIt(Constants.SW_CHALLENGE_FAILED);
+                                }
+                                break;
                         }
                         break;
                     case RELOAD:
@@ -191,15 +229,17 @@ public class PurseApplet extends Applet implements ISO7816 {
                     case PAYMENT:
 
                         break;
-                    default:
-                        ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
                 }
                 break;
         }
     }
 
     private boolean isAuthenticated() {
-        return transientState[1] == AUTHENTICATED;
+        return transientState[STATE_INDEX_AUTHENTICATION_STATUS] == AUTHENTICATED;
+    }
+
+    private void setAuthenticated(boolean val) {
+        transientState[STATE_INDEX_AUTHENTICATION_STATUS] = (val) ? AUTHENTICATED : NOT_AUTHENTICATED;
     }
 
     private void send_own_public_key_certificate(APDU apdu) {
@@ -264,14 +304,12 @@ public class PurseApplet extends Applet implements ISO7816 {
         signature.init(masterVerifyKey, Signature.MODE_VERIFY);
         short mLen = otherKey.getModulus(tmp, (short) 0);
         short tLen = otherKey.getExponent(tmp, mLen);
-        // short mLen = pubKey.getModulus(tmp, (short) 0);
-        // short tLen = pubKey.getExponent(tmp, mLen);
-        short len = readBuffer(apdu, tmp, (short) (mLen + tLen));
-
-        if (signature.verify(tmp, (short) 0, (short) (mLen + tLen), tmp, (short) (mLen + tLen), len)) {
+        short len = readBuffer(apdu, tmp, (short) (mLen + tLen + 1));
+        if (signature.verify(tmp, (short) 0, (short) (mLen + tLen), tmp, (short) (mLen + tLen + 1), len /* Constants.CERTIFICATE_LENGTH */)) {
             return true;
         } else {
-            ISOException.throwIt(SW_DATA_INVALID);
+            clearTransientState();
+            ISOException.throwIt(Constants.SW_CERTIFICATE_CHECK_FAILED);
             return false;
         }
     }
@@ -280,6 +318,7 @@ public class PurseApplet extends Applet implements ISO7816 {
      * Resets the transient state as if no communication has happened yet.
      */
     private void clearTransientState() {
+        setAuthenticated(false);
         otherKey.clearKey();
         transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
     }
