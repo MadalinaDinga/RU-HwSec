@@ -37,6 +37,11 @@ public class Tester {
 
     RSAPrivateKey masterPrivateKey;
     RSAPublicKey masterPublicKey;
+    RSAPrivateKey terminalPrivateKey;
+    RSAPublicKey terminalPublicKey;
+    byte[] terminalCertificate;
+    RSAPublicKey cardPublicKey;
+    RSAPrivateKey cardPrivateKey;
 
     public void run() {
         try {
@@ -46,6 +51,7 @@ public class Tester {
 
             testIssuing(applet);
             testAuthentication(applet);
+            testPayment(applet);
         } catch (Exception e) {
             System.err.println("Failed to get cardchannel to the applet.");
         }
@@ -56,8 +62,7 @@ public class Tester {
          * Create required certificates for terminal
          */
         KeyPairGenerator generator = null;
-        RSAPublicKey terminalPublicKey = null;
-        RSAPrivateKey terminalPrivateKey = null;
+        
         Signature signer = null;
         byte[] terminalCertificate = null;
         try {
@@ -117,20 +122,20 @@ public class Tester {
             rapdu = applet.transmit(exponent);
             System.out.println(rapdu.toString());
             BigInteger e = new BigInteger(1, rapdu.getData());
-            RSAPublicKey pk = (RSAPublicKey) constructKey(m, e);
+            cardPublicKey = (RSAPublicKey) constructKey(m, e);
             // 2.
             System.out.println("Certificate Exchange"); 
             System.out.println(certificate);
             rapdu = applet.transmit(certificate);
             System.out.println(rapdu.toString());
             byte[] cert = rapdu.getData();
-            if (!verifyCertificate(cert, pk)) {
+            if (!verifyCertificate(cert, cardPublicKey)) {
                 System.err.println("Certificate was not valid");
             }
             // 3.
             System.out.println("Challenge the card.");
             Cipher cipher = Cipher.getInstance("RSA/None/PKCS1Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, pk);
+            cipher.init(Cipher.ENCRYPT_MODE, cardPublicKey);
             byte[] challenge = cipher.doFinal(nonce);
             CommandAPDU apdu = new CommandAPDU(0x00, 0, 0, 0, challenge, 0);
             System.out.println(apdu +"\n" + challenge.length);
@@ -165,7 +170,79 @@ public class Tester {
 
 
     public void testIssuing(CardChannel applet) {
+        
+    }
 
+
+    public void testPayment(CardChannel applet) {
+        
+        System.out.println("Starting Payement protocol");
+        
+        try {
+            CommandAPDU capdu = new CommandAPDU(0x00, Constants.START_PAYMENT_PROTOCOL, 0x00, 0x00, null, 0);
+            ResponseAPDU rapdu = applet.transmit(capdu);
+            System.out.println(rapdu.toString());
+
+            byte[] amount = new byte[] {50};
+            capdu = new CommandAPDU(0, 0, 0, 0, amount, 0);
+            rapdu = applet.transmit(capdu);
+            System.out.println(rapdu.toString());
+
+            byte[] counter = rapdu.getData();
+            System.out.println(counter.length);
+            System.out.println((int)  counter[0] + " " + (int) counter[1]);
+
+            SecureRandom random = new SecureRandom();
+            byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];
+            random.nextBytes(nonce);
+
+            capdu = new CommandAPDU(0, 0, 0, 0, nonce, 0);
+            rapdu = applet.transmit(capdu);
+
+            System.out.println(rapdu);
+
+            Signature sig = Signature.getInstance("SHA1withRSA");
+            sig.initVerify(cardPublicKey);
+
+            sig.update(amount);
+            sig.update(nonce);
+            sig.update(counter);
+
+            if (sig.verify(rapdu.getData())) {
+                System.out.println("Signature is valid");
+            } else {
+                System.err.println("Signature on nonces and amount is invalid");
+            }
+
+            sig.initSign(terminalPrivateKey);
+            sig.update(amount);
+            sig.update(nonce);
+            sig.update(counter);
+
+            byte[] signature = sig.sign();
+
+            capdu = new CommandAPDU(0, 0, 0, 0, signature, 0);
+            rapdu = applet.transmit(capdu);
+
+            System.out.println(rapdu.toString());
+
+            sig.initVerify(cardPublicKey);
+            sig.update(amount);
+            sig.update(nonce);
+            sig.update(counter);
+            sig.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getModulus()));
+            sig.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getPublicExponent()));
+
+            if (sig.verify(rapdu.getData())) {
+                System.out.println("Received a valid payment signature");
+            } else {
+                System.err.println("Received invalid payment signature");
+            }
+            
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public boolean verifyCertificate(byte[] certificate, RSAPublicKey key) throws InvalidKeyException, SignatureException, NoSuchAlgorithmException {

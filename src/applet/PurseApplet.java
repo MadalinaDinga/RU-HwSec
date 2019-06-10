@@ -36,6 +36,8 @@ public class PurseApplet extends Applet implements ISO7816 {
     
     private RandomData random;
 
+    private OwnerPIN pin;
+
     /*
      *        STATE
      */
@@ -46,6 +48,7 @@ public class PurseApplet extends Applet implements ISO7816 {
     private static final byte STATE_ISSUED = 1;
     /** The balance on the card stored in EEPROM */
     private short balance;
+    private short transactionCounter;
     /** The transient state of the application, stored in RAM. */
     private byte[] transientState;
     private static final short STATE_INDEX_CURRENT_PROTOCOL = 0;
@@ -68,6 +71,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         transientState = JCSystem.makeTransientByteArray((short) 4, JCSystem.CLEAR_ON_DESELECT);
         persistentState = STATE_INIT;
         balance = 0;
+        transactionCounter = 0;
         // Create crypto primitives
         cipher = Cipher.getInstance(Cipher.ALG_RSA_PKCS1, false);
         signature = Signature.getInstance(Signature.ALG_RSA_SHA_PKCS1, false);
@@ -84,6 +88,10 @@ public class PurseApplet extends Applet implements ISO7816 {
         masterVerifyKey.clearKey();
         // Reserve room for certificate
         keyCertificate = new byte[Constants.CERTIFICATE_LENGTH];
+        // Set the pin
+        pin = new OwnerPIN((byte) 3, (byte) 4);
+        tmp[0] = tmp[1] = tmp[2] = tmp[3] = 0;
+        pin.update(tmp, (short) 0, (byte) 4);
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
@@ -227,7 +235,46 @@ public class PurseApplet extends Applet implements ISO7816 {
 
                         break;
                     case PAYMENT:
-
+                        switch(transientState[STATE_INDEX_STEP]) {
+                            case 0:
+                                if (! isAuthenticated()) {
+                                    ISOException.throwIt(SW_SECURITY_STATUS_NOT_SATISFIED);
+                                    clearTransientState();
+                                } else {
+                                    // TMP contents:: Amount
+                                    transientState[STATE_INDEX_PARTIAL_STEP] = (byte) readBuffer(apdu, tmp, (short) 0);
+                                    Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
+                                    apdu.setOutgoingAndSend((short) 0, (short) 2);
+                                    transientState[STATE_INDEX_STEP]++;
+                                }
+                                break;
+                            case 1:
+                                // TMP contents:: Amount, nonce_t
+                                len = readBuffer(apdu, tmp, Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]));
+                                Util.setShort(tmp, (short) (len + transientState[STATE_INDEX_PARTIAL_STEP]), transactionCounter);
+                                signature.init(privKey, Signature.MODE_SIGN);
+                                transientState[STATE_INDEX_PARTIAL_STEP] = (byte) (2 + transientState[STATE_INDEX_PARTIAL_STEP] + len); 
+                                short length = signature.sign(tmp, (short) 0, (short) (transientState[STATE_INDEX_PARTIAL_STEP]), apdu.getBuffer(), (short) 0);
+                                apdu.setOutgoingAndSend((short) 0, length);
+                                transientState[STATE_INDEX_STEP]++;
+                                break;
+                            case 2:
+                                // length of Amount + nonce + transactionCounter
+                                short off = Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]);
+                                // Expect signature over data for checking integrity.
+                                len = readBuffer(apdu, tmp, off);
+                                signature.init(otherKey, Signature.MODE_VERIFY);
+                                if (signature.verify(tmp, (short) 0, off, tmp, off, len)) {
+                                    short modOff = otherKey.getModulus(tmp, off);
+                                    short expOff = otherKey.getExponent(tmp, (short) (modOff + off));
+                                    signature.init(privKey, Signature.MODE_SIGN);
+                                    len = signature.sign(tmp, (short) 0, (short) (off + modOff + expOff), apdu.getBuffer(), (short) 0);
+                                    apdu.setOutgoingAndSend((short) 0, len);
+                                } else {
+                                    clearTransientState();
+                                    ISOException.throwIt(SW_DATA_INVALID);
+                                }
+                            }
                         break;
                 }
                 break;
