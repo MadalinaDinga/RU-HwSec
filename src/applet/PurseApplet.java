@@ -265,24 +265,25 @@ public class PurseApplet extends Applet implements ISO7816 {
                             transientState[STATE_INDEX_STEP]++;
                             break;
                         case 2:
-                            if (! isAuthenticated()) {
+                            if (!isAuthenticated()) {
                                 ISOException.throwIt(SW_SECURITY_STATUS_NOT_SATISFIED);
                                 clearTransientState();
-                            } else {
-                                // TMP contents:: Amount
-                                transientState[STATE_INDEX_PARTIAL_STEP] = (byte) readBuffer(apdu, tmp, (short) 0);
-                                Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
-                                /** 
-                                 * Send response APDU using setOutgoingAndSend(bOff, len) method.
-                                 * Equivalent to the three method calls:
-                                 *   sendOutgoing() - construct response APDU
-                                 *   setOutgoingLength()
-                                 *   sendBytes() - build response data in apdu buffer
-                                 */ 
-                                apdu.setOutgoingAndSend((short) 0, (short) 2);
-                                transientState[STATE_INDEX_STEP]++;
+                                break;
                             }
+                            // TMP contents:: Amount
+                            transientState[STATE_INDEX_PARTIAL_STEP] = (byte) readBuffer(apdu, tmp, (short) 0);
+                            Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
+                            /** 
+                             * Send response APDU using setOutgoingAndSend(bOff, len) method.
+                             * Equivalent to the three method calls:
+                             *   sendOutgoing() - construct response APDU
+                             *   setOutgoingLength()
+                             *   sendBytes() - build response data in apdu buffer
+                             */ 
+                            apdu.setOutgoingAndSend((short) 0, (short) 2);
+                            transientState[STATE_INDEX_STEP]++;
                             break;
+                        
                         case 3:
                             // TMP contents:: Amount, nonce_t
                             len = readBuffer(apdu, tmp, Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]));
