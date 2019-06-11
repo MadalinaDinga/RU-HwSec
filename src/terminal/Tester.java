@@ -43,6 +43,11 @@ public class Tester {
     RSAPublicKey cardPublicKey;
     RSAPrivateKey cardPrivateKey;
 
+    public static void main(String[] args) {
+        Security.insertProviderAt(new BouncyCastleProvider(), 1);
+        (new Tester()).run();
+    }
+
     public void run() {
         try {
             CardChannel applet = Utils.get();
@@ -296,11 +301,6 @@ public class Tester {
         } catch (InvalidKeySpecException e) {
             System.err.println("Keyspec is invalid");
         }
-    }
-
-    public static void main(String[] args) {
-        Security.insertProviderAt(new BouncyCastleProvider(), 1);
-        (new Tester()).run();
     }
 
     /**
