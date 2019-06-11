@@ -23,6 +23,7 @@ public class Constants {
 	public static final byte START_AUTHENTICATION_PROTOCOL = 0x0a;
 	public static final byte START_RELOAD_PROTOCOL = 0x0b;
     public static final byte START_PAYMENT_PROTOCOL = 0x0c;
+    public static final byte START_PIN_RESET_PROTOCOL = 0x0d;
     
     /*
      *          REASONS

@@ -44,9 +44,10 @@ public class PurseApplet extends Applet implements ISO7816 {
 
     /** The persistent state of the application, stored in EEPROM */
     private byte persistentState;
+    private boolean PIN_RESET_REQUIRED;
+
     private static final byte STATE_INIT = 0;
     private static final byte STATE_ISSUED = 1;
-    private static final boolean STATE_PIN_RESET_REQUIRED = false;
     /** The balance on the card stored in EEPROM */
     private short balance;
     private short transactionCounter;
@@ -63,6 +64,7 @@ public class PurseApplet extends Applet implements ISO7816 {
     private static final byte NOT_AUTHENTICATED = (byte) 3;
     private static final byte RELOAD = (byte) 4;
     private static final byte PAYMENT = (byte) 5;
+    private static final byte PIN_RESET = (byte) 6;
 
     public PurseApplet() {
         // Create buffer
@@ -71,6 +73,8 @@ public class PurseApplet extends Applet implements ISO7816 {
         // Create state
         transientState = JCSystem.makeTransientByteArray((short) 4, JCSystem.CLEAR_ON_DESELECT);
         persistentState = STATE_INIT;
+        PIN_RESET_REQUIRED = true;
+        
         balance = 0;
         transactionCounter = 0;
         // Create crypto primitives
@@ -93,7 +97,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         pin = new OwnerPIN((byte) 3, (byte) 4);
         tmp[0] = tmp[1] = tmp[2] = tmp[3] = 0;
         pin.update(tmp, (short) 0, (byte) 4);
-        //TODO: add to persistent state the PIN state
+        
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
@@ -142,6 +146,15 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 transientState[STATE_INDEX_CURRENT_PROTOCOL] = AUTHENTICATING;
                                 transientState[STATE_INDEX_STEP] = 0;
                                 transientState[STATE_INDEX_PARTIAL_STEP] = 0;
+                                break;
+                            case Constants.START_PIN_RESET_PROTOCOL:
+                                if (isAuthenticated()) {
+                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = PIN_RESET;
+                                    transientState[STATE_INDEX_STEP] = 0;
+                                    transientState[STATE_INDEX_PARTIAL_STEP] = 0;
+                                } else {
+                                    ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
+                                }
                                 break;
                             case Constants.START_RELOAD_PROTOCOL:
                                 if (isAuthenticated()) {
@@ -233,22 +246,29 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 break;
                         }
                         break;
+                    case PIN_RESET:
+                        //PIN reset protocol
+                        PIN_RESET_REQUIRED = false;
+                        break;
                     case RELOAD:
                     switch(transientState[STATE_INDEX_STEP]) {
                         case 0:
-                            //TODO: check PIN state, if reset needed: transientState[STATE_INDEX_STEP]++;
-                            // else transientState[STATE_INDEX_STEP]+2;
+                            if (PIN_RESET_REQUIRED) {
+                                //send state to terminal, which will initialize the PIN_RESET protocol
+                                //TODO
+                            } else {
+                                transientState[STATE_INDEX_STEP] = (byte) (transientState[STATE_INDEX_STEP] + 2);
+                            }
                             break;
                         case 1:
-                            //TODO: set new PIN
+                            //read PIN reset result and go to the next step of the reload protocol, if successful
+                            transientState[STATE_INDEX_STEP]++;
                             break;
                         case 2:
-                            // start actual reload protocol steps
                             if (! isAuthenticated()) {
                                 ISOException.throwIt(SW_SECURITY_STATUS_NOT_SATISFIED);
                                 clearTransientState();
                             } else {
-                                
                                 // TMP contents:: Amount
                                 transientState[STATE_INDEX_PARTIAL_STEP] = (byte) readBuffer(apdu, tmp, (short) 0);
                                 Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
