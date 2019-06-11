@@ -80,14 +80,28 @@ public class Tester {
             terminalCertificate = signer.sign();
 
             System.out.println(verifyCertificate(terminalCertificate, terminalPublicKey));
-
+            
+            System.out.println("Start writing terminal keys to disk");
+            
+            try (FileOutputStream stream = new FileOutputStream("pos-certificate")) {
+                writeKey(terminalPublicKey, "pos-key-pub");
+                writeKey(terminalPrivateKey, "pos-key-priv");
+                stream.write(terminalCertificate);
+            } catch (IOException e) {
+                System.err.println("Failed to write certificate to disc.");
+                e.printStackTrace();
+            }
+            
+            
         } catch (NoSuchAlgorithmException e) {
             System.err.println("Failed to generate keys for terminal");
             e.printStackTrace();
         } catch (SignatureException e) {
             System.err.println("Failed to generate certificate");
+            e.printStackTrace();
         } catch (InvalidKeyException e) {
             System.err.println("Invalid signature key.");
+            e.printStackTrace();
         }
         /*
          * Run the protocol

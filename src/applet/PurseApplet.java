@@ -62,6 +62,11 @@ public class PurseApplet extends Applet implements ISO7816 {
     private static final byte NOT_AUTHENTICATED = (byte) 3;
     private static final byte RELOAD = (byte) 4;
     private static final byte PAYMENT = (byte) 5;
+    
+    /*
+                TAGS
+    */
+    private static final byte[] CHALLENGE_TAG = new byte[] {0, 1, 0, 1};
 
     public PurseApplet() {
         // Create buffer
@@ -196,17 +201,20 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 }
                                 break;
                             case 3:
-                                /* Expected is an encrypted challenge, we must respond with the unencrypted value */
+                                /* Expected is a plain challenge, we must respond with the signature on it */
                                 len = readBuffer(apdu, tmp, (short) 0);
-                                cipher.init(privKey, Cipher.MODE_DECRYPT);
-                                try {
-                                    len = cipher.doFinal(tmp, (short) 0, len, apdu.getBuffer(), (short) 0);
+                                
+                                if ((byte) 0x00 == Util.arrayCompare(tmp, (short) 0, CHALLENGE_TAG, (short) 0, (short) CHALLENGE_TAG.length)) {
+                                    
+                                    signature.init(privKey, Signature.MODE_SIGN);
+                                    short lenSig = signature.sign(tmp, (short) 0, len, apdu.getBuffer(), (short) 0);
+                                    
                                     transientState[STATE_INDEX_STEP]++;
-                                    apdu.setOutgoingAndSend((short) 0, len);
-                                } catch (CryptoException e) {
-                                    ISOException.throwIt((short) 0x04);
+                                    apdu.setOutgoingAndSend((short) 0, lenSig);
+                                } else {
+                                    ISOException.throwIt((short) 0x00);
                                 }
-                                    break;
+                                break;
                             case 4:
                                 /* Don't expect any data, return a challenge */
                                 apdu.setIncomingAndReceive();
@@ -226,7 +234,7 @@ public class PurseApplet extends Applet implements ISO7816 {
                                     transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
                                 } else {
                                     clearTransientState();
-                                    ISOException.throwIt(Constants.SW_CHALLENGE_FAILED);
+                                    ISOException.throwIt(Constants.SW_CHALLENGE_FAILED); //TODO: Failing message
                                 }
                                 break;
                         }
