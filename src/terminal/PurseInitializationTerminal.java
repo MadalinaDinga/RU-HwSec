@@ -191,9 +191,6 @@ public class PurseInitializationTerminal {
             rapdu = applet.transmit(capdu);
             System.out.println(rapdu.toString());
 
-
-
-
         } catch (InvalidKeySpecException ex) {
             System.err.println("Failed to construct key from given modulus and exponent");
         } catch (NoSuchAlgorithmException ex) {

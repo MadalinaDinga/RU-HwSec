@@ -31,6 +31,8 @@ public class Constants {
     public static final short SW_CHALLENGE_FAILED = (short) 0x000B;
     public static final byte[] CHALLENGE_TAG = new byte[] {(byte) 0, (byte) 1, (byte) 0, (byte) 1};
     public static final short CHALLENGE_TAG_LENGTH = (short) CHALLENGE_TAG.length;
+    public static final short SW_INVALID_AMOUNT = (short) 0x000C;
+    public static final short SW_INSUFFICIENT_BALANCE = (short) 0x000D;
 
 
 

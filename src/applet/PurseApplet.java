@@ -227,7 +227,7 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 transientState[STATE_INDEX_STEP]++;
                                 break;
                             case 5:
-                                /* Expected is the original value. */
+                                /* Verify signature on the challenge. */
                                 short challengeLength = (short) (CHALLENGE_TAG.length + Constants.CHALLENGE_LENGTH);
                                 len = readBuffer(apdu, tmp, challengeLength);
                                 signature.init(otherKey, Signature.MODE_VERIFY);
@@ -254,8 +254,19 @@ public class PurseApplet extends Applet implements ISO7816 {
                                     clearTransientState();
                                 } else {
                                     // TMP contents:: Amount
-                                    transientState[STATE_INDEX_PARTIAL_STEP] = (byte) readBuffer(apdu, tmp, (short) 0);
-                                    Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
+                                    len = readBuffer(apdu, tmp, (short) 0);
+                                    transientState[STATE_INDEX_PARTIAL_STEP] = (byte) len;
+                                    
+                                    if (Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]) > 2
+                                            || Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]) < 0) {
+                                        ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
+                                        clearTransientState();
+                                    } else if (Util.makeShort(tmp[0], tmp[1]) > balance) {
+                                        clearTransientState();
+                                        ISOException.throwIt(Constants.SW_INSUFFICIENT_BALANCE);
+                                    }
+                                    
+                                    Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter); 
                                     apdu.setOutgoingAndSend((short) 0, (short) 2);
                                     transientState[STATE_INDEX_STEP]++;
                                 }
@@ -281,7 +292,10 @@ public class PurseApplet extends Applet implements ISO7816 {
                                     short expOff = otherKey.getExponent(tmp, (short) (modOff + off));
                                     signature.init(privKey, Signature.MODE_SIGN);
                                     len = signature.sign(tmp, (short) 0, (short) (off + modOff + expOff), apdu.getBuffer(), (short) 0);
+                                    balance -= Util.makeShort(tmp[0], tmp[1]); 
                                     apdu.setOutgoingAndSend((short) 0, len);
+                                    transactionCounter++;
+                                    clearTransientState();
                                 } else {
                                     clearTransientState();
                                     ISOException.throwIt(SW_DATA_INVALID);

@@ -32,6 +32,8 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
     private RSAPublicKey terminalPublicKey;
     private RSAPublicKey masterVerifyKey;
     private byte[] terminalKeyCertificate;
+    private RSAPublicKey cardVerifyKey;
+    private CardChannel applet;
     
     private enum State {
         NONE,
@@ -304,20 +306,23 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton14ActionPerformed
 
     private void jButton11ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton11ActionPerformed
-        System.out.println("Accept button pressed");
+        
         switch (state) {
             case ENTERING_AMOUNT:
                 try {
                     AuthenticationProtocol ap = new AuthenticationProtocol(
                             terminalPublicKey, terminalPrivateKey,
                             masterVerifyKey, terminalKeyCertificate);
-                    System.out.println("Get connection");
-                    CardChannel applet = Utils.get();
                     
-                    System.out.println("Start auth");
+                    applet = Utils.get();
+                    
                     if (ap.run(applet)) {
                         System.out.println("Authenticated");
+                        cardVerifyKey = ap.cardVerifyKey;
                         setState(state.ENTERING_PIN);
+                    } else {
+                        System.err.println("Card not recognized.");
+                        setState(State.ENTERING_AMOUNT);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -326,7 +331,14 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
                 break;
             case ENTERING_PIN:
                 // Send pin to terminal.
-                screen.append("\nPin is sent to card.\n");
+                try {
+                    amountNumber = Integer.parseInt(amount);
+                    PaymentProtocol pp = new PaymentProtocol(this, amountNumber, terminalPublicKey, terminalPrivateKey, cardVerifyKey);
+                    pp.run(applet);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    System.err.println("Failed to connect to card");
+                }
         }
     }//GEN-LAST:event_jButton11ActionPerformed
 
@@ -452,6 +464,11 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
         }
     }
 
+    protected void insufficientBalance() {
+        screen.setText("Insufficient balance on card!");
+        state = null;
+    }
+    
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton10;

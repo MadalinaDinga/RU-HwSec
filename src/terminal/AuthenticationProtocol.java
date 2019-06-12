@@ -26,13 +26,13 @@ import org.apache.commons.lang3.ArrayUtils;
  *
  * @author tom
  */
-public class AuthenticationProtocol {
+public class AuthenticationProtocol extends Protocol {
 
     private final byte[] terminalKeyCertificate;
     private final RSAPublicKey masterVerifyKey;
     private final RSAPrivateKey terminalPrivateKey;
     private final RSAPublicKey terminalPublicKey;
-    private RSAPublicKey cardVerifyKey;
+    public RSAPublicKey cardVerifyKey;
  
     public AuthenticationProtocol(
             RSAPublicKey terminalPubKey,
@@ -101,7 +101,9 @@ public class AuthenticationProtocol {
             // Respond to the challenge received by the card
             rapdu = sendCommand(applet, respondToChallenge(response), 0x9000, "Response to challenge of card resulted in SW: ");
         
-        
+            // Set the public field cardVerifyKey so it can be accessed.
+            this.cardVerifyKey = cardVerifyKey;
+            
         } catch (CardException e) {
             e.printStackTrace();
             return false;
@@ -136,13 +138,6 @@ public class AuthenticationProtocol {
     
     private CommandAPDU respondToChallenge(byte[] response) {
         return new CommandAPDU(0, 0, 0, 0, response, 0);
-    }
-    
-    private ResponseAPDU sendCommand(CardChannel applet, CommandAPDU capdu, int expectedSW, String reason) throws CardException {
-        ResponseAPDU rapdu = applet.transmit(capdu);
-        if (rapdu.getSW() != expectedSW) 
-                throw new CardException(reason + rapdu.getSW());
-        return rapdu;
     }
 
     private boolean verifyKeyCertificate(byte[] modulus, byte[] exponent, byte[] certificate, RSAPublicKey verificationKey) {
