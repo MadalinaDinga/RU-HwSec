@@ -304,15 +304,19 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton14ActionPerformed
 
     private void jButton11ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton11ActionPerformed
+        System.out.println("Accept button pressed");
         switch (state) {
             case ENTERING_AMOUNT:
                 try {
                     AuthenticationProtocol ap = new AuthenticationProtocol(
                             terminalPublicKey, terminalPrivateKey,
                             masterVerifyKey, terminalKeyCertificate);
+                    System.out.println("Get connection");
                     CardChannel applet = Utils.get();
                     
+                    System.out.println("Start auth");
                     if (ap.run(applet)) {
+                        System.out.println("Authenticated");
                         setState(state.ENTERING_PIN);
                     }
                 } catch (Exception e) {

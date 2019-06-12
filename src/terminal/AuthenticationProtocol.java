@@ -91,12 +91,12 @@ public class AuthenticationProtocol {
             rapdu = sendCommand(applet, readyForChallenge(), 0x9000, "Requesting challenge from card resulted in SW: ");
             byte[] challenge = rapdu.getData();
             
-            if (isWellFormattedChallenge(challenge)) {
+            if (!isWellFormattedChallenge(challenge)) {
                 System.err.println("Received challenge is illformated.");
                 return false;
             }
             
-            byte[] response = respondToChallenge(challenge, terminalPrivateKey);
+            byte[] response = signChallenge(challenge, terminalPrivateKey);
             
             // Respond to the challenge received by the card
             rapdu = sendCommand(applet, respondToChallenge(response), 0x9000, "Response to challenge of card resulted in SW: ");
@@ -173,10 +173,10 @@ public class AuthenticationProtocol {
     }
     
     private boolean isWellFormattedChallenge(byte[] challenge) {
-        return ByteBuffer.wrap(Constants.CHALLENGE_TAG, 0, 3).equals(ByteBuffer.wrap(challenge,1,3));
+        return ByteBuffer.wrap(Constants.CHALLENGE_TAG, 0, 3).equals(ByteBuffer.wrap(challenge,0,3));
     }
     
-    private byte[] respondToChallenge(byte[] challenge, RSAPrivateKey signingKey) throws CardException {
+    private byte[] signChallenge(byte[] challenge, RSAPrivateKey signingKey) throws CardException {
         try {
             Signature signer = Signature.getInstance("SHA1withRSA");
             signer.initSign(signingKey);

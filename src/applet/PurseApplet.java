@@ -66,9 +66,10 @@ public class PurseApplet extends Applet implements ISO7816 {
     /*
                 TAGS
     */
-    private static final byte[] CHALLENGE_TAG = new byte[] {0, 1, 0, 1};
+    private final byte[] CHALLENGE_TAG;
 
     public PurseApplet() {
+        CHALLENGE_TAG = new byte[] {0, 1, 0, 1};
         // Create buffer
         // tmp = JCSystem.makeTransientByteArray((short)256,JCSystem.CLEAR_ON_DESELECT);
         tmp = JCSystem.makeTransientByteArray((short) 512, JCSystem.CLEAR_ON_DESELECT);
@@ -218,16 +219,19 @@ public class PurseApplet extends Applet implements ISO7816 {
                             case 4:
                                 /* Don't expect any data, return a challenge */
                                 apdu.setIncomingAndReceive();
-                                random.generateData(tmp, (short) 0, Constants.CHALLENGE_LENGTH);
-                                cipher.init(otherKey, Cipher.MODE_ENCRYPT);
-                                len = cipher.doFinal(tmp, (short) 0, Constants.CHALLENGE_LENGTH, apdu.getBuffer(), (short) 0);
+                                random.generateData(tmp, (short) CHALLENGE_TAG.length, Constants.CHALLENGE_LENGTH);
+                                Util.arrayCopy(CHALLENGE_TAG, (short) 0, tmp, (short) 0, (short) CHALLENGE_TAG.length);
+                                Util.arrayCopy(tmp, (short) 0, apdu.getBuffer(), (short) 0, (short) (CHALLENGE_TAG.length + Constants.CHALLENGE_LENGTH));
+                                
+                                apdu.setOutgoingAndSend((short) 0, (short) (CHALLENGE_TAG.length + Constants.CHALLENGE_LENGTH));
                                 transientState[STATE_INDEX_STEP]++;
-                                apdu.setOutgoingAndSend((short) 0, len);
                                 break;
                             case 5:
                                 /* Expected is the original value. */
-                                len = readBuffer(apdu, tmp, Constants.CHALLENGE_LENGTH);
-                                if ((byte) 0x00 == Util.arrayCompare(tmp, (short) 0, tmp, Constants.CHALLENGE_LENGTH, Constants.CHALLENGE_LENGTH))  {
+                                short challengeLength = (short) (CHALLENGE_TAG.length + Constants.CHALLENGE_LENGTH);
+                                len = readBuffer(apdu, tmp, challengeLength);
+                                signature.init(otherKey, Signature.MODE_VERIFY);
+                                if (signature.verify(tmp, (short) 0, challengeLength, tmp, challengeLength, len))  {
                                     transientState[STATE_INDEX_STEP]++;
                                     apdu.setOutgoingAndSend((short) 0, (short) 0);
                                     setAuthenticated(true);
