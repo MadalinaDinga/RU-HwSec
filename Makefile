@@ -57,7 +57,7 @@ compile-terminal:
 	find src/${TERMINAL_PACKAGE}/ -name "*.java" > terminal-sources.txt
 	find src/${COMMON_PACKAGE}/ -name "*.java" >> terminal-sources.txt
 	# Compile source files
-	javac -classpath lib/bcprov-jdk15on-161.jar:${JC_PATH} -d bin/ @terminal-sources.txt 
+	javac -classpath lib/bcprov-jdk15on-161.jar:lib/commons-lang3-3.0.1.jar:${JC_PATH} -d bin/ @terminal-sources.txt 
 	# Remove generated auxiliary file
 	rm terminal-sources.txt
 
