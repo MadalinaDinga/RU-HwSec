@@ -21,8 +21,12 @@ public class PurseApplet extends Applet implements ISO7816 {
     private KeyPair kp;
     private RSAPublicKey pubKey;
     private RSAPrivateKey privKey;
+    private KeyPair encKP;
+    private RSAPublicKey encKey;
+    private RSAPrivateKey decKey;
     /** EEPROM for holding own key certificate */
     private byte[] keyCertificate;
+    private byte[] encKeyCertificate;
 
     /** Public key for verifying signatures within the PKI. */
     private RSAPublicKey masterVerifyKey;
@@ -51,10 +55,10 @@ public class PurseApplet extends Applet implements ISO7816 {
     private short transactionCounter;
     /** The transient state of the application, stored in RAM. */
     private byte[] transientState;
+    private short[] offset;
     private static final short STATE_INDEX_CURRENT_PROTOCOL = 0;
     private static final short STATE_INDEX_STEP = 1;
-    private static final short STATE_INDEX_PARTIAL_STEP = 2;
-    private static final short STATE_INDEX_AUTHENTICATION_STATUS = 3;
+    private static final short STATE_INDEX_AUTHENTICATION_STATUS = 2;
 
     private static final byte NO_PROTOCOL = (byte) 0;
     private static final byte AUTHENTICATING = (byte) 1;
@@ -74,7 +78,8 @@ public class PurseApplet extends Applet implements ISO7816 {
         // tmp = JCSystem.makeTransientByteArray((short)256,JCSystem.CLEAR_ON_DESELECT);
         tmp = JCSystem.makeTransientByteArray((short) 512, JCSystem.CLEAR_ON_DESELECT);
         // Create state
-        transientState = JCSystem.makeTransientByteArray((short) 4, JCSystem.CLEAR_ON_DESELECT);
+        transientState = JCSystem.makeTransientByteArray((short) 3, JCSystem.CLEAR_ON_DESELECT);
+        offset = JCSystem.makeTransientShortArray((short) 1, JCSystem.CLEAR_ON_DESELECT);
         persistentState = STATE_INIT;
         balance = 0;
         transactionCounter = 0;
@@ -82,12 +87,23 @@ public class PurseApplet extends Applet implements ISO7816 {
         cipher = Cipher.getInstance(Cipher.ALG_RSA_PKCS1, false);
         signature = Signature.getInstance(Signature.ALG_RSA_SHA_PKCS1, false);
         random = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
-        // Creating keys
+        // Creating signing keys
         kp = new KeyPair(KeyPair.ALG_RSA, KeyBuilder.LENGTH_RSA_1024);
         kp.genKeyPair();
         privKey = (RSAPrivateKey) kp.getPrivate();
         pubKey = (RSAPublicKey) kp.getPublic();
-
+        // Creating encryption keys
+        encKP = new KeyPair(KeyPair.ALG_RSA, KeyBuilder.LENGTH_RSA_1024);
+        encKP.genKeyPair();
+        encKey = (RSAPublicKey) kp.getPublic();
+        decKey = (RSAPrivateKey) kp.getPrivate();
+        // Self sign your certificate
+        encKeyCertificate = new byte[Constants.CERTIFICATE_LENGTH];
+        signature.init(privKey, Signature.MODE_SIGN);
+        short modLen = encKey.getModulus(tmp, (short) 0);
+        short expLen = encKey.getExponent(tmp, modLen);
+        signature.sign(tmp, (short) 0, (short) (modLen + expLen), encKeyCertificate, (short) 0);
+        // Initialize space for storing keys
         otherKey = (RSAPublicKey) KeyBuilder.buildKey(KeyBuilder.TYPE_RSA_PUBLIC, KeyBuilder.LENGTH_RSA_1024, false); // TODO: Research KeyEncryption interface
         otherKey.clearKey();
         masterVerifyKey = (RSAPublicKey) KeyBuilder.buildKey(KeyBuilder.TYPE_RSA_PUBLIC, KeyBuilder.LENGTH_RSA_1024, false); // TODO: Research KeyEncryption interface
@@ -145,13 +161,11 @@ public class PurseApplet extends Applet implements ISO7816 {
                             case Constants.START_AUTHENTICATION_PROTOCOL:
                                 transientState[STATE_INDEX_CURRENT_PROTOCOL] = AUTHENTICATING;
                                 transientState[STATE_INDEX_STEP] = 0;
-                                transientState[STATE_INDEX_PARTIAL_STEP] = 0;
                                 break;
                             case Constants.START_RELOAD_PROTOCOL:
                                 if (isAuthenticated()) {
                                     transientState[STATE_INDEX_CURRENT_PROTOCOL] = RELOAD;
                                     transientState[STATE_INDEX_STEP] = 0;
-                                    transientState[STATE_INDEX_PARTIAL_STEP] = 0;
                                 } else {
                                     ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
                                 }
@@ -160,7 +174,6 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 if (isAuthenticated()) {
                                     transientState[STATE_INDEX_CURRENT_PROTOCOL] = PAYMENT;
                                     transientState[STATE_INDEX_STEP] = 0;
-                                    transientState[STATE_INDEX_PARTIAL_STEP] = 0;
                                 } else {
                                     ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
                                 }
@@ -233,13 +246,28 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 signature.init(otherKey, Signature.MODE_VERIFY);
                                 if (signature.verify(tmp, (short) 0, challengeLength, tmp, challengeLength, len))  {
                                     transientState[STATE_INDEX_STEP]++;
-                                    apdu.setOutgoingAndSend((short) 0, (short) 0);
-                                    setAuthenticated(true);
-                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
+                                    Util.arrayCopy(encKeyCertificate, (short) 0, apdu.getBuffer(), (short) 0, Constants.CERTIFICATE_LENGTH);
+                                    apdu.setOutgoingAndSend((short) 0, Constants.CERTIFICATE_LENGTH);
                                 } else {
                                     clearTransientState();
                                     ISOException.throwIt(Constants.SW_CHALLENGE_FAILED); //TODO: Failing message
                                 }
+                                break;
+                            case 6:
+                                /* Send out encryption key */
+                                len = readBuffer(apdu, tmp, (short) 0);
+                                len = encKey.getModulus(apdu.getBuffer(), (short) 0);
+                                apdu.setOutgoingAndSend((short) 0, len);
+                                transientState[STATE_INDEX_STEP]++;
+                                break;
+                            case 7:
+                                /* Send out encryption key */
+                                len = readBuffer(apdu, tmp, (short) 0);
+                                len = encKey.getExponent(apdu.getBuffer(), (short) 0);
+                                apdu.setOutgoingAndSend((short) 0, len);
+                                transientState[STATE_INDEX_STEP]++;
+                                setAuthenticated(true);
+                                transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
                                 break;
                         }
                         break;
@@ -255,10 +283,9 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 } else {
                                     // TMP contents:: Amount
                                     len = readBuffer(apdu, tmp, (short) 0);
-                                    transientState[STATE_INDEX_PARTIAL_STEP] = (byte) len;
+                                    offset[0] = len;
                                     
-                                    if (Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]) > 2
-                                            || Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]) < 0) {
+                                    if (offset[0] > 2 || offset[0] < 0) {
                                         ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
                                         clearTransientState();
                                     } else if (Util.makeShort(tmp[0], tmp[1]) > balance) {
@@ -273,25 +300,25 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 break;
                             case 1:
                                 // TMP contents:: Amount, nonce_t
-                                len = readBuffer(apdu, tmp, Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]));
-                                Util.setShort(tmp, (short) (len + transientState[STATE_INDEX_PARTIAL_STEP]), transactionCounter);
-                                signature.init(privKey, Signature.MODE_SIGN);
-                                transientState[STATE_INDEX_PARTIAL_STEP] = (byte) (2 + transientState[STATE_INDEX_PARTIAL_STEP] + len); 
-                                short length = signature.sign(tmp, (short) 0, (short) (transientState[STATE_INDEX_PARTIAL_STEP]), apdu.getBuffer(), (short) 0);
-                                apdu.setOutgoingAndSend((short) 0, length);
+                                offset[0] += readBuffer(apdu, tmp, offset[0]);
+                                // TMP contents:: Amount, nonce_t, transactionCounter
+                                Util.setShort(tmp, (short) (offset[0]), transactionCounter);
+                                offset[0]+= 2;
+                                
+                                signature.init(privKey, Signature.MODE_SIGN); 
+                                len = signature.sign(tmp, (short) 0, (short) offset[0], apdu.getBuffer(), (short) 0);
+                                apdu.setOutgoingAndSend((short) 0, len);
                                 transientState[STATE_INDEX_STEP]++;
                                 break;
                             case 2:
-                                // length of Amount + nonce + transactionCounter
-                                short off = Util.makeShort((byte) 0x00, transientState[STATE_INDEX_PARTIAL_STEP]);
                                 // Expect signature over data for checking integrity.
-                                len = readBuffer(apdu, tmp, off);
+                                len = readBuffer(apdu, tmp, offset[0]);
                                 signature.init(otherKey, Signature.MODE_VERIFY);
-                                if (signature.verify(tmp, (short) 0, off, tmp, off, len)) {
-                                    short modOff = otherKey.getModulus(tmp, off);
-                                    short expOff = otherKey.getExponent(tmp, (short) (modOff + off));
+                                if (signature.verify(tmp, (short) 0, offset[0], tmp, offset[0], len)) {
+                                    short modOff = otherKey.getModulus(tmp, offset[0]);
+                                    short expOff = otherKey.getExponent(tmp, (short) (modOff + offset[0]));
                                     signature.init(privKey, Signature.MODE_SIGN);
-                                    len = signature.sign(tmp, (short) 0, (short) (off + modOff + expOff), apdu.getBuffer(), (short) 0);
+                                    len = signature.sign(tmp, (short) 0, (short) (offset[0] + modOff + expOff), apdu.getBuffer(), (short) 0);
                                     balance -= Util.makeShort(tmp[0], tmp[1]); 
                                     apdu.setOutgoingAndSend((short) 0, len);
                                     transactionCounter++;

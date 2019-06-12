@@ -58,9 +58,7 @@ public class PaymentProtocol extends Protocol {
             ByteBuffer buff = ByteBuffer.allocate(2);
             buff.putShort((short) amount);
             byte[] amountBytes = buff.array();
-            
-            System.out.println(Constants.SW_INSUFFICIENT_BALANCE);
-            
+                        
             try {
                 rapdu = sendCommand(applet, amount(amountBytes), 0x9000, "Sending over the amount resulted in SW: ");
             } catch (CardException e) {

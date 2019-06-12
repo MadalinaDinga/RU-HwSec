@@ -33,6 +33,7 @@ public class AuthenticationProtocol extends Protocol {
     private final RSAPrivateKey terminalPrivateKey;
     private final RSAPublicKey terminalPublicKey;
     public RSAPublicKey cardVerifyKey;
+    private RSAPublicKey cardEncryptionKey;
  
     public AuthenticationProtocol(
             RSAPublicKey terminalPubKey,
@@ -81,8 +82,9 @@ public class AuthenticationProtocol extends Protocol {
             byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];            
             
             rapdu = sendCommand(applet, challenge(nonce), 0x9000, "Sending challenge to card resulted in SW: ");
+            byte[] challengeResponse = rapdu.getData();
             
-            if (!verifyKeyCertificate(Constants.CHALLENGE_TAG, nonce, rapdu.getData(), cardVerifyKey)) {
+            if (!verifyChallengeResponse(Constants.CHALLENGE_TAG, nonce, challengeResponse, cardVerifyKey)) {
                 System.err.println("Card failed to repond to the challenge");
                 return false;
             }
@@ -100,10 +102,27 @@ public class AuthenticationProtocol extends Protocol {
             
             // Respond to the challenge received by the card
             rapdu = sendCommand(applet, respondToChallenge(response), 0x9000, "Response to challenge of card resulted in SW: ");
-        
+            byte[] encryptionKeyCertificate = rapdu.getData();
+            
+            // Let the card send its modulus
+            rapdu = sendCommand(applet, empty(), 0x9000, "Request for enc modulus resulted in SW: ");
+            byte[] encryptionKeyModulus = rapdu.getData();
+            
+            // Let the card send its exponent
+            rapdu = sendCommand(applet, empty(), 0x9000, "Request for enc exponent resulted in SW: ");
+            byte[] encryptionKeyExponent = rapdu.getData();
+            
+            if (!verifyKeyCertificate(encryptionKeyModulus, encryptionKeyExponent, encryptionKeyCertificate, cardVerifyKey)) {
+                System.err.println("Invalid certificate for encryption key received");
+                return false;
+            }
+            
+            RSAPublicKey cardEncryptionKey = buildCardKeys(encryptionKeyModulus, encryptionKeyExponent);
+            
             // Set the public field cardVerifyKey so it can be accessed.
             this.cardVerifyKey = cardVerifyKey;
-            
+            // Set the public field cardEncryptionKey so it can be accessed.
+            this.cardEncryptionKey = cardEncryptionKey;
         } catch (CardException e) {
             e.printStackTrace();
             return false;
@@ -138,33 +157,6 @@ public class AuthenticationProtocol extends Protocol {
     
     private CommandAPDU respondToChallenge(byte[] response) {
         return new CommandAPDU(0, 0, 0, 0, response, 0);
-    }
-
-    private boolean verifyKeyCertificate(byte[] modulus, byte[] exponent, byte[] certificate, RSAPublicKey verificationKey) {
-        try{
-            Signature verifier = Signature.getInstance("SHA1withRSA");
-        
-            verifier.initVerify(verificationKey);
-            verifier.update(modulus);
-            verifier.update(exponent);
-            
-            return verifier.verify(certificate);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-    
-    private RSAPublicKey buildCardKeys(byte[] modulus, byte[] exponent) throws CardException {
-        try {
-            RSAPublicKeySpec spec = new RSAPublicKeySpec(new BigInteger(1, modulus), new BigInteger(1, exponent));
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            PublicKey pk = kf.generatePublic(spec);
-            return (RSAPublicKey) pk;
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new CardException("Key received from the card is not valid");
-        }
     }
     
     private boolean isWellFormattedChallenge(byte[] challenge) {
