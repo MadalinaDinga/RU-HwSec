@@ -3,6 +3,8 @@ package common;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import javacard.security.RSAPublicKey;
+
 
 public class Logger {
     PrintWriter paymentLogPW;
@@ -13,15 +15,15 @@ public class Logger {
         reloadLogPW = new PrintWriter(new FileWriter("reload-log", true)); 
     }
 
-    public void writePayment(short amount, byte[] cId, byte[] tId) {
+    public void writePayment(short amount, RSAPublicKey cardPublicKey, RSAPublicKey terminalPublicKey, byte[] proofOfPayment) {
         long timestamp = System.currentTimeMillis();
-        paymentLogPW.println(timestamp+" "+tId+""+cId+" "+amount);
+        paymentLogPW.println(timestamp+"; "+terminalPublicKey+"; "+cardPublicKey+"; "+amount+"; "+proofOfPayment+"\n");
         paymentLogPW.close();
     }
 
-    public void writeReload(short amount, byte[] cId, byte[] tId) {
+    public void writeReload(short amount, RSAPublicKey cardPublicKey, RSAPublicKey terminalPublicKey, byte[] proofOfPayment) {
         long timestamp = System.currentTimeMillis();
-        reloadLogPW.println(timestamp+" "+tId+""+cId+" "+amount);
+        reloadLogPW.println(timestamp+"; "+terminalPublicKey+"; "+cardPublicKey+"; "+amount+"; "+proofOfPayment+"\n");
         reloadLogPW.close();
     }
 
