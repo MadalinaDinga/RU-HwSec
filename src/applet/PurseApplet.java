@@ -53,6 +53,7 @@ public class PurseApplet extends Applet implements ISO7816 {
     /** The balance on the card stored in EEPROM */
     private short balance;
     private short transactionCounter;
+    private boolean pin_reset_required;
     /** The transient state of the application, stored in RAM. */
     private byte[] transientState;
     private short[] offset;
@@ -66,6 +67,7 @@ public class PurseApplet extends Applet implements ISO7816 {
     private static final byte NOT_AUTHENTICATED = (byte) 3;
     private static final byte RELOAD = (byte) 4;
     private static final byte PAYMENT = (byte) 5;
+    private static final byte PIN_RESET = (byte) 6;
     
     /*
                 TAGS
@@ -110,10 +112,12 @@ public class PurseApplet extends Applet implements ISO7816 {
         masterVerifyKey.clearKey();
         // Reserve room for certificate
         keyCertificate = new byte[Constants.CERTIFICATE_LENGTH];
-        // Set the pin
+        // Set the default pin
         pin = new OwnerPIN((byte) 3, (byte) 4);
         tmp[0] = tmp[1] = tmp[2] = tmp[3] = 0;
         pin.update(tmp, (short) 0, (byte) 4);
+        pin_reset_required = true;
+
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
@@ -163,11 +167,17 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 transientState[STATE_INDEX_STEP] = 0;
                                 break;
                             case Constants.START_RELOAD_PROTOCOL:
-                                if (isAuthenticated()) {
-                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = RELOAD;
+                                if (!isAuthenticated()) {
+                                    ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
+                                    break;
+                                }
+
+                                if (pin_reset_required) {
+                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = PIN_RESET;
                                     transientState[STATE_INDEX_STEP] = 0;
                                 } else {
-                                    ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
+                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = RELOAD;
+                                    transientState[STATE_INDEX_STEP] = 0;
                                 }
                                 break;
                             case Constants.START_PAYMENT_PROTOCOL:
@@ -271,9 +281,64 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 break;
                         }
                         break;
-                    case RELOAD:
-
+                    case PIN_RESET:
+                        // PIN reset protocol
+                        pin_reset_required = false;
+                        clearTransientState();
                         break;
+                    case RELOAD:
+                    switch(transientState[STATE_INDEX_STEP]) {
+                        case 0:
+                            if (! isAuthenticated()) {
+                                ISOException.throwIt(SW_SECURITY_STATUS_NOT_SATISFIED);
+                                clearTransientState();
+                                break;
+                            } 
+                            // TMP contents:: Amount
+                            len = readBuffer(apdu, tmp, (short) 0);
+                            offset[0] = len;
+                            
+                            if (offset[0] > 2 || offset[0] < 0) {
+                                ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
+                                clearTransientState();
+                            } 
+                            
+                            Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter); 
+                            apdu.setOutgoingAndSend((short) 0, (short) 2);
+                            transientState[STATE_INDEX_STEP]++;
+                        
+                            break;
+                        case 1:
+                            // TMP contents:: Amount, nonce_t
+                            offset[0] += readBuffer(apdu, tmp, offset[0]);
+                            // TMP contents:: Amount, nonce_t, transactionCounter
+                            Util.setShort(tmp, (short) (offset[0]), transactionCounter);
+                            offset[0]+= 2;
+                            
+                            signature.init(privKey, Signature.MODE_SIGN); 
+                            len = signature.sign(tmp, (short) 0, (short) offset[0], apdu.getBuffer(), (short) 0);
+                            apdu.setOutgoingAndSend((short) 0, len);
+                            transientState[STATE_INDEX_STEP]++;
+                            break;
+                        case 2:
+                            // Expect signature over data for checking integrity.
+                            len = readBuffer(apdu, tmp, offset[0]);
+                            signature.init(otherKey, Signature.MODE_VERIFY);
+                            if (signature.verify(tmp, (short) 0, offset[0], tmp, offset[0], len)) {
+                                short modOff = otherKey.getModulus(tmp, offset[0]);
+                                short expOff = otherKey.getExponent(tmp, (short) (modOff + offset[0]));
+                                signature.init(privKey, Signature.MODE_SIGN);
+                                len = signature.sign(tmp, (short) 0, (short) (offset[0] + modOff + expOff), apdu.getBuffer(), (short) 0);
+                                balance += Util.makeShort(tmp[0], tmp[1]); 
+                                apdu.setOutgoingAndSend((short) 0, len);
+                                transactionCounter++;
+                                clearTransientState();
+                            } else {
+                                clearTransientState();
+                                ISOException.throwIt(SW_DATA_INVALID);
+                            }
+                        }
+                    break;
                     case PAYMENT:
                         switch(transientState[STATE_INDEX_STEP]) {
                             case 0:
