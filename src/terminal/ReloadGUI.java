@@ -6,13 +6,14 @@
 package terminal;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import javax.smartcardio.CardChannel;
-import static terminal.Tester.readFile;
 
 /**
  *
@@ -377,5 +378,21 @@ public class ReloadGUI extends javax.swing.JFrame {
         String [] lines = screen.getText().split("\n");
         lines[screen.getLineCount() - 1] = newText;
         screen.setText(String.join("\n", lines));
+    }
+    
+    /**
+     * Reads the key from the file.
+     * 
+     * @return byte array with contents of the file.
+     * 
+     * @throws IOException if file could not be read.
+     */
+    public static byte[] readFile(String fname) throws IOException {
+        FileInputStream in = new FileInputStream(fname);
+        int length = in.available();
+        byte[] data = new byte[length];
+        in.read(data);
+        in.close();
+        return data;
     }
 }

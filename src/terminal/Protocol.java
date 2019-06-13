@@ -25,10 +25,11 @@ public abstract class Protocol {
     public abstract boolean run(CardChannel applet);
     
     protected ResponseAPDU sendCommand(CardChannel applet, CommandAPDU capdu, int expectedSW, String reason) throws CardException {
+        System.out.println(capdu);
         ResponseAPDU rapdu = applet.transmit(capdu);
         if (rapdu.getSW() != expectedSW) 
                 throw new CardException(reason + rapdu.getSW());
-        System.out.println(rapdu);
+        System.out.println("\t" + rapdu);
         return rapdu;
     }
     

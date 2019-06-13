@@ -17,8 +17,9 @@ APPLET_PACKAGE=applet
 APPLET_MAIN_CLASS=PurseApplet
 TERMINAL_PACKAGE=terminal
 TERMINAL_MAIN_CLASS_POS=PoSTerminalGUI
-TERMINAL_MAIN_CLASS_RELOAD=ReloadPurseTerminal
-TERMINAL_MAIN_CLASS_ISSUER=PurseInitializationTerminal
+TERMINAL_MAIN_CLASS_RELOAD=ReloadGUI
+MAIN_CLASS_ISSUER=CLI
+
 COMMON_PACKAGE = common
 
 
@@ -39,9 +40,9 @@ compile-applet:
 	javac -source 1.3 -target 1.1 -d bin/ -cp ${JC_PATH} @applet-sources.txt
 	rm applet-sources.txt
 
-run-issuer-terminal: terminal
+setup: terminal
 	# Invoke main class
-	java -classpath ${CLASS_PATH} ${TERMINAL_PACKAGE}.${TERMINAL_MAIN_CLASS_ISSUER}
+	java -classpath ${CLASS_PATH} ${TERMINAL_PACKAGE}.${MAIN_CLASS_ISSUER}
 
 run-reload-terminal: terminal
 	# Invoke main class of reload terminal
@@ -66,6 +67,9 @@ clean:
 	rm -rf bin/${APPLET_PACKAGE}
 	rm -rf bin/cap/*
 	rm -rf bin/${TERMINAL_PACKAGE}
+	rm -rf bin/${COMMON_PACKAGE}
+	rm *key*
+	rm *certificate*
 	find bin/ -maxdepth 1 -type f -delete
 
 uninstall:

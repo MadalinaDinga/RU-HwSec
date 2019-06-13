@@ -153,12 +153,16 @@ public class PurseApplet extends Applet implements ISO7816 {
                     break;
                     case Constants.INS_STORE_KEY_CERTIFICATE:
                     store_own_certificate(apdu);
+                    apdu.setOutgoingAndSend((short) 0, (short) 0);
                     break;
                     case Constants.INS_STORE_MASTER_KEY:
                     store_public_master_key(apdu);
+                    apdu.setOutgoingAndSend((short) 0, (short) 0);
                     break;
                     case Constants.INS_ISSUE:
                     persistentState = STATE_ISSUED;
+                    apdu.setOutgoingAndSend((short) 0, (short) 0);
+                    break;
                     default:
                         ISOException.throwIt(SW_INS_NOT_SUPPORTED);
                 }
@@ -500,9 +504,9 @@ public class PurseApplet extends Applet implements ISO7816 {
     private boolean verifyCertificate(APDU apdu) {
         signature.init(masterVerifyKey, Signature.MODE_VERIFY);
         short mLen = otherKey.getModulus(tmp, (short) 0);
-        short tLen = otherKey.getExponent(tmp, mLen);
-        short len = readBuffer(apdu, tmp, (short) (mLen + tLen + 1));
-        return signature.verify(tmp, (short) 0, (short) (mLen + tLen), tmp, (short) (mLen + tLen + 1), len); 
+        short eLen = otherKey.getExponent(tmp, mLen);
+        short len = readBuffer(apdu, tmp, (short) (mLen + eLen + 1));
+        return signature.verify(tmp, (short) 0, (short) (mLen + eLen), tmp, (short) (mLen + eLen + 1), len); 
     }
 
     /**

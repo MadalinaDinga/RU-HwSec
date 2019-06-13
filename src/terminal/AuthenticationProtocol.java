@@ -63,9 +63,11 @@ public class AuthenticationProtocol extends Protocol {
             
             // Exchange certificates with the card
             rapdu = sendCommand(applet, certificate(), 0x9000, "Exchanging the certificate resulted in SW: ");
+            
             cardCertificate = rapdu.getData();
             
             if (!verifyKeyCertificate(cardModulus, cardExponent, cardCertificate, masterVerifyKey)) {
+            
                 System.out.println("Signature of card is invalid.");
                 return false;
             }
@@ -73,8 +75,9 @@ public class AuthenticationProtocol extends Protocol {
             cardVerifyKey = buildCardKeys(cardModulus, cardExponent);
             
             // Challenge the card
-            // SecureRandom random = new SecureRandom();
-            byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];            
+            byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];   
+            SecureRandom random = new SecureRandom();
+            random.nextBytes(nonce);         
             
             rapdu = sendCommand(applet, challenge(nonce), 0x9000, "Sending challenge to card resulted in SW: ");
             byte[] challengeResponse = rapdu.getData();

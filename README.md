@@ -1,18 +1,12 @@
-# Usage
-- To compile and start pos terminal use
-	`make run-pos-terminal`
-
-- To compile and start reload terminal use
-	`make run-reload-terminal`
-
-- To compile and start issuer terminal use
-	`make run-issuer-terminal`
-
-- To compile and update applet use
+# DEMO
+- To install the applet
 	`make update-applet`
-
-- To remove all output files from building use
-	`make clean`
+- To create keys and initialize the card
+	`make setup`
+- To run the reload terminal
+	`make run-reload-terminal`
+- To run the point of sale terminal
+	`make run-pos-terminal`
 
 ## Makefile
 Make sure the following variables are set correctly for your project:

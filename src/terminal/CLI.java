@@ -112,6 +112,11 @@ public class CLI {
             signer.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getPublicExponent()));
             byte[] terminalCertificate = signer.sign();
             
+            signer.initVerify(masterPublicKey);
+            signer.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getModulus()));
+            signer.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getPublicExponent()));
+            System.out.println(terminalType + " certificate: " + signer.verify(terminalCertificate));
+            
             System.out.println("Start writing terminal keys to disk");
             
             try (
@@ -187,7 +192,13 @@ public class CLI {
             signer.initSign(masterPrivateKey);
             signer.update(mod);
             signer.update(exp);
+            
             byte[] signature = signer.sign();
+            
+            signer.initVerify(masterPublicKey);
+            signer.update(mod);
+            signer.update(exp);
+            System.out.println("Card certificate: " + signer.verify(signature));
             
             // Transmit the certificate to the card
             capdu = new CommandAPDU((byte) 0x00, INS_STORE_KEY_CERTIFICATE, 0, 0, signature, 0);

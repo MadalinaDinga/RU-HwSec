@@ -6,6 +6,8 @@
 package terminal;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.Security;
 import java.security.interfaces.RSAPrivateKey;
@@ -14,8 +16,6 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import javax.smartcardio.CardChannel;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
-import static terminal.Tester.readFile;
 
 /**
  *
@@ -507,6 +507,22 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
     protected void insufficientBalance() {
         screen.setText("Insufficient balance on card!");
         state = null;
+    }
+    
+    /**
+     * Reads the key from the file.
+     * 
+     * @return byte array with contents of the file.
+     * 
+     * @throws IOException if file could not be read.
+     */
+    public static byte[] readFile(String fname) throws IOException {
+        FileInputStream in = new FileInputStream(fname);
+        int length = in.available();
+        byte[] data = new byte[length];
+        in.read(data);
+        in.close();
+        return data;
     }
     
     // Variables declaration - do not modify//GEN-BEGIN:variables
