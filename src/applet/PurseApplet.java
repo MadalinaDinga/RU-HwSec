@@ -241,7 +241,7 @@ public class PurseApplet extends Applet implements ISO7816 {
                                     transientState[STATE_INDEX_STEP]++;
                                     apdu.setOutgoingAndSend((short) 0, lenSig);
                                 } else {
-                                    ISOException.throwIt((short) 0x00);
+                                    ISOException.throwIt((short) Constants.SW_WRONG_FORMAT);
                                 }
                                 break;
                             case 4:
@@ -363,17 +363,19 @@ public class PurseApplet extends Applet implements ISO7816 {
                                         ISOException.throwIt(Constants.SW_INSUFFICIENT_BALANCE);
                                     }
                                     
-                                    Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter); 
-                                    apdu.setOutgoingAndSend((short) 0, (short) 2);
+                                    Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
+                                    random.generateData(apdu.getBuffer(), (short) 2, Constants.CHALLENGE_LENGTH);
+                                    offset[0]+= Constants.CHALLENGE_LENGTH + (short) 2;
+                                    // TMP contents:: Amount, transactionCounter, nonce
+                                    Util.arrayCopy(apdu.getBuffer(), (short) 0, tmp, (short) 2, offset[0]);
+                                    
+                                    apdu.setOutgoingAndSend((short) 0, (short) (2 + Constants.CHALLENGE_LENGTH));
                                     transientState[STATE_INDEX_STEP]++;
                                 }
                                 break;
                             case 1:
-                                // TMP contents:: Amount, nonce_t
-                                offset[0] += readBuffer(apdu, tmp, offset[0]);
-                                // TMP contents:: Amount, nonce_t, transactionCounter
-                                Util.setShort(tmp, (short) (offset[0]), transactionCounter);
-                                offset[0]+= 2;
+                                // TMP contents:: Amount, transactionCounter, nonce, nonce_t
+                                offset[0] += readBuffer(apdu, tmp, offset[0]);                             
                                 
                                 signature.init(privKey, Signature.MODE_SIGN); 
                                 len = signature.sign(tmp, (short) 0, (short) offset[0], apdu.getBuffer(), (short) 0);
@@ -385,8 +387,9 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 len = readBuffer(apdu, tmp, offset[0]);
                                 cipher.init(decKey, Cipher.MODE_DECRYPT);
                                 len = cipher.doFinal(tmp, offset[0], len, tmp, offset[0]);
-
-                                if (pin.check(tmp, (short) (offset[0]), (byte) len)) {
+                                // Check if the encryption is fresh
+                                byte nonceOk = Util.arrayCompare(tmp, (short) (offset[0] + 4 + 2), tmp, (short) 4, Constants.CHALLENGE_LENGTH);
+                                if (pin.check(tmp, (short) (offset[0]), (byte) 4) && nonceOk == 0) {
                                     transientState[STATE_INDEX_STEP]++;
                                     ISOException.throwIt(SW_NO_ERROR);
                                 } else {
@@ -420,6 +423,7 @@ public class PurseApplet extends Applet implements ISO7816 {
                                     clearTransientState();
                                     ISOException.throwIt(SW_DATA_INVALID);
                                 }
+                                break;
                             }
                         break;
                 }

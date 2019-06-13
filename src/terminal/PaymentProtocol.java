@@ -64,7 +64,7 @@ public class PaymentProtocol extends Protocol {
             if (!retry) {
             
                 // Signal start of the protocol
-                rapdu = sendCommand(applet, startPayment(), 0x9000, "Start authentication message returned SW: ");
+                rapdu = sendCommand(applet, startPayment(), 0x9000, "Start payment message returned SW: ");
 
 
                 // Send the amount
@@ -110,16 +110,21 @@ public class PaymentProtocol extends Protocol {
                 
                 Cipher cipher = Cipher.getInstance("RSA/None/PKCS1Padding");
                 cipher.init(Cipher.ENCRYPT_MODE, cardEncryptionKey);
-                byte[] encPin = cipher.doFinal(bytePin);
-                
+                cipher.update(bytePin);
+                cipher.update(cardNonce);
+                byte[] encPin = cipher.doFinal();
+                System.out.println("Sending pin.");
                 rapdu = sendCommand(applet, pin(encPin), 0x9000, "Sending over the pin resulted in SW: ");
             } catch (Exception e) {
                 if (e.getMessage().contains("" + Constants.SW_WRONG_PIN)) {
+                    System.out.println("Wrong pin.");
                     gui.wrongPin();
                     retry = true;
+                    return false;
                 } else if (e.getMessage().contains("" + Constants.SW_BLOCKED)) {
                     gui.blockedCard();
                     retry = false;
+                    return false;
                 } else {
                     e.printStackTrace();
                     return false;
@@ -173,8 +178,8 @@ public class PaymentProtocol extends Protocol {
             sig.initVerify(cardVerifyKey);
             
             sig.update(amount);
-            sig.update(tNonce);
             sig.update(cNonce);
+            sig.update(tNonce);
             sig.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getModulus()) );
             sig.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getPublicExponent()) );
             
@@ -191,8 +196,8 @@ public class PaymentProtocol extends Protocol {
             sig.initVerify(cardVerifyKey);
 
             sig.update(amount);
-            sig.update(nonce);
             sig.update(counter);
+            sig.update(nonce);
 
             if (sig.verify(signature)) {
                 System.out.println("Signature is valid");
@@ -213,8 +218,8 @@ public class PaymentProtocol extends Protocol {
             sig.initSign(terminalPrivateKey);
 
             sig.update(amount);
-            sig.update(nonce);
             sig.update(counter);
+            sig.update(nonce);
 
             return sig.sign(); 
         } catch (Exception e) {

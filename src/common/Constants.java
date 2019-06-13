@@ -35,6 +35,7 @@ public class Constants {
     public static final short SW_INSUFFICIENT_BALANCE = (short) 0x000D;
     public static final short SW_WRONG_PIN = (short) 0x000E;
     public static final short SW_BLOCKED = (short) 0x000F;
+    public static final short SW_WRONG_FORMAT = (short) 0x009;
 
 
 
