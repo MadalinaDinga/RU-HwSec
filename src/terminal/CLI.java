@@ -40,6 +40,14 @@ public class CLI {
 
     public static void main(String[] args) {
         Security.insertProviderAt(new BouncyCastleProvider(), 1);
+        CLI cli = new CLI();
+        System.out.println("Start generating keys.");
+        cli.generateMasterKeys();
+        cli.generatePoSKeyMaterial();
+        cli.generateReloadKeyMaterial();
+        System.out.println("Initialize card");
+        cli.initializeCard();
+        System.out.println("Done.");
     }
     
     private RSAPublicKey masterPublicKey;
@@ -175,7 +183,6 @@ public class CLI {
             byte[] exp = rapdu.getData();
 
             // Create the signature on the key received by the card
-            KeyFactory factory = KeyFactory.getInstance("RSA");
             Signature signer = Signature.getInstance("SHA1withRSA");
             signer.initSign(masterPrivateKey);
             signer.update(mod);
