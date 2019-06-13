@@ -5,7 +5,6 @@
  */
 package terminal;
 
-import java.math.BigInteger;
 import java.security.Signature;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -13,13 +12,9 @@ import javax.smartcardio.CardChannel;
 import javax.smartcardio.CardException;
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
-
 import common.Constants;
 import java.nio.ByteBuffer;
-import java.security.KeyFactory;
-import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.spec.RSAPublicKeySpec;
 import org.apache.commons.lang3.ArrayUtils;
 
 /**
@@ -78,7 +73,7 @@ public class AuthenticationProtocol extends Protocol {
             cardVerifyKey = buildCardKeys(cardModulus, cardExponent);
             
             // Challenge the card
-            SecureRandom random = new SecureRandom();
+            // SecureRandom random = new SecureRandom();
             byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];            
             
             rapdu = sendCommand(applet, challenge(nonce), 0x9000, "Sending challenge to card resulted in SW: ");

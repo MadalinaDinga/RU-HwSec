@@ -7,7 +7,6 @@ package terminal;
 
 import common.Constants;
 import java.nio.ByteBuffer;
-import java.security.SecureRandom;
 import java.security.Signature;
 
 import java.security.interfaces.RSAPrivateKey;
@@ -63,12 +62,13 @@ public class ReloadProtocol extends Protocol {
             } catch (CardException e) {
                 throw e;
             }
+            // transaction counter
             byte[] cardNonce = rapdu.getData();
         
             // Send nonce to the card
-            SecureRandom random = new SecureRandom();
             byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];  
             
+            //TODO: add tag
             rapdu = sendCommand(applet, nonce(nonce), 0x9000, "Sending over the nonce resulted in SW: ");
             byte[] signature = rapdu.getData();
             
