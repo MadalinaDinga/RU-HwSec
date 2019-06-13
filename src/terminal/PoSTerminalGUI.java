@@ -6,7 +6,6 @@
 package terminal;
 
 import java.io.File;
-import java.io.RandomAccessFile;
 import java.security.KeyFactory;
 import java.security.Security;
 import java.security.interfaces.RSAPrivateKey;

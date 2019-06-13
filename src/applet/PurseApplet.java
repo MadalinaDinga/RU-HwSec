@@ -502,13 +502,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         short mLen = otherKey.getModulus(tmp, (short) 0);
         short tLen = otherKey.getExponent(tmp, mLen);
         short len = readBuffer(apdu, tmp, (short) (mLen + tLen + 1));
-        if (signature.verify(tmp, (short) 0, (short) (mLen + tLen), tmp, (short) (mLen + tLen + 1), len /* Constants.CERTIFICATE_LENGTH */)) {
-            return true;
-        } else {
-            clearTransientState();
-            ISOException.throwIt(Constants.SW_CERTIFICATE_CHECK_FAILED);
-            return false;
-        }
+        return signature.verify(tmp, (short) 0, (short) (mLen + tLen), tmp, (short) (mLen + tLen + 1), len); 
     }
 
     /**

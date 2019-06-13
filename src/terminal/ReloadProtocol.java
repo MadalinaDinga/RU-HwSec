@@ -22,14 +22,14 @@ import javax.smartcardio.ResponseAPDU;
  */
 public class ReloadProtocol extends Protocol {
     
-    private final ReloadTerminalGUI gui;
+    private final ReloadGUI gui;
     private final RSAPrivateKey terminalPrivateKey;
     private final RSAPublicKey terminalPublicKey;
     private final RSAPublicKey cardVerifyKey;
     private final int amount;
     public byte[] proofOfReload;
     
-    public ReloadProtocol(ReloadTerminalGUI gui,
+    public ReloadProtocol(ReloadGUI gui,
             int amount,
             RSAPublicKey terminalPubKey,
             RSAPrivateKey terminalPrivateKey,
@@ -125,7 +125,7 @@ public class ReloadProtocol extends Protocol {
             sig.update(cNonce);
             sig.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getModulus()) );
             sig.update(Utils.unsignedByteFromBigInt(terminalPublicKey.getPublicExponent()) );
-            
+               
             return sig.verify(signature);
         } catch (Exception e) {
             e.printStackTrace();
