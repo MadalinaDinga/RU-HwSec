@@ -50,6 +50,7 @@ public class PurseApplet extends Applet implements ISO7816 {
     private byte persistentState;
     private static final byte STATE_INIT = 0;
     private static final byte STATE_ISSUED = 1;
+    private static final byte STATE_BLOCKED = 3;
     /** The balance on the card stored in EEPROM */
     private short balance;
     private short transactionCounter;
@@ -130,6 +131,10 @@ public class PurseApplet extends Applet implements ISO7816 {
         if (selectingApplet()) {
             clearTransientState();
             return;
+        }
+        
+        if (persistentState == STATE_BLOCKED) {
+            ISOException.throwIt((short) 0x00);
         }
 
         switch(persistentState) {
@@ -311,6 +316,29 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 transientState[STATE_INDEX_STEP]++;
                                 break;
                             case 2:
+                                // Receive and decrypt pin
+                                len = readBuffer(apdu, tmp, offset[0]);
+                                cipher.init(decKey, Cipher.MODE_DECRYPT);
+                                len = cipher.doFinal(tmp, offset[0], len, tmp, offset[0]);
+
+                                if (pin.check(tmp, (short) (offset[0]), (byte) len)) {
+                                    transientState[STATE_INDEX_STEP]++;
+                                    ISOException.throwIt(SW_NO_ERROR);
+                                } else {
+                                    byte tries = pin.getTriesRemaining();
+                                    if (tries == (byte) 0x00) {
+                                        // Block the card
+                                        persistentState = STATE_BLOCKED;
+                                        clearTransientState();
+                                        ISOException.throwIt(Constants.SW_BLOCKED);
+                                    } else {
+                                        apdu.getBuffer()[0] = tries;
+                                        apdu.setOutgoingAndSend((short) 0, (short) 1);
+                                        ISOException.throwIt(Constants.SW_WRONG_PIN);
+                                    }
+                                }
+                                break;
+                            case 3:
                                 // Expect signature over data for checking integrity.
                                 len = readBuffer(apdu, tmp, offset[0]);
                                 signature.init(otherKey, Signature.MODE_VERIFY);

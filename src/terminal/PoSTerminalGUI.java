@@ -34,31 +34,53 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
     private byte[] terminalKeyCertificate;
     private RSAPublicKey cardVerifyKey;
     private CardChannel applet;
+    private RSAPublicKey cardEncryptionKey;
+    private PaymentProtocol pp;
+
+    void wrongPin() {
+        setState(State.RETRY_PIN);
+    }
+
+    void blockedCard() {
+        screen.setText("Your card got blocked.\n");
+        screen.append("Transaction is aborted.\n");
+        setState(State.GOT_BLOCKED);
+    }
     
     private enum State {
         NONE,
         ENTERING_AMOUNT,
-        ENTERING_PIN
+        ENTERING_PIN,
+        GOT_BLOCKED,
+        RETRY_PIN,
+        DONE
     }
     
     private void setState(State s) {
+        state = s;
         switch (s) {
             case NONE:
-                state = s;
                 screen.setText("Aborted!\n");
                 break;
             case ENTERING_AMOUNT:
-                state = s;
                 amount = "";
                 screen.setText("");
                 screen.append("Enter the amount to be paid.\n");
             break;
             case ENTERING_PIN:
-                state = s;
                 pin = "";
                 amountNumber = Integer.parseInt(amount);
                 screen.append("\nEnter your pin:\n->");
             break;
+            case RETRY_PIN:
+                pin = "";
+                String[] lines = screen.getText().split("\n");
+                screen.setText("");
+                screen.append(lines[0] + "\n");
+                screen.append(lines[1] + "\n");
+                screen.append("Wrong pin, please enter again.\n");
+                screen.append("-> ");
+                break;
         }
     }
     
@@ -78,6 +100,7 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
                     screen.append(amount);
                 }
                 break;
+            case RETRY_PIN:
             case ENTERING_PIN:
                 pin += number;
                 setLastLine("-> " + String.join("", java.util.Collections.nCopies(pin.length(), "*")));
@@ -319,6 +342,7 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
                     if (ap.run(applet)) {
                         System.out.println("Authenticated");
                         cardVerifyKey = ap.cardVerifyKey;
+                        cardEncryptionKey = ap.cardEncryptionKey;
                         setState(state.ENTERING_PIN);
                     } else {
                         System.err.println("Card not recognized.");
@@ -333,15 +357,32 @@ public class PoSTerminalGUI extends javax.swing.JFrame {
                 // Send pin to terminal.
                 try {
                     amountNumber = Integer.parseInt(amount);
-                    PaymentProtocol pp = new PaymentProtocol(this, amountNumber, terminalPublicKey, terminalPrivateKey, cardVerifyKey);
-                    pp.run(applet);
+                    pp = new PaymentProtocol(this, amountNumber, terminalPublicKey, terminalPrivateKey, cardVerifyKey, cardEncryptionKey);
+                    if (pp.run(applet)) {
+                        paymentSucces();
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     System.err.println("Failed to connect to card");
                 }
+                break;
+            case RETRY_PIN:
+                try {
+                    if (pp.run(applet)) {
+                        paymentSucces();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
         }
     }//GEN-LAST:event_jButton11ActionPerformed
 
+    private void paymentSucces() {
+        screen.setText("Payment successfull!");
+        setState(State.DONE);
+    }
+    
+    
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         numberEntered("1");
     }//GEN-LAST:event_jButton1ActionPerformed

@@ -79,7 +79,7 @@ public class PurseInitializationTerminal {
 
             // capdu = new CommandAPDU((byte) 0xCC, Constants.INS_KEY_CERTIFICATE, 0, 0, null, 0);
             capdu = new CommandAPDU((byte) 0x01, Constants.INS_KEY_CERTIFICATE, 0, 0, null, 0);
-            rapdu = applet.transmit(capdu);
+            rapdu = applet.transmit(capdu); 
             byte[] certificate = rapdu.getData();
 
             Signature verifier = Signature.getInstance("SHA1withRSA");

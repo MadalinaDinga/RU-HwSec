@@ -33,7 +33,7 @@ public class AuthenticationProtocol extends Protocol {
     private final RSAPrivateKey terminalPrivateKey;
     private final RSAPublicKey terminalPublicKey;
     public RSAPublicKey cardVerifyKey;
-    private RSAPublicKey cardEncryptionKey;
+    public RSAPublicKey cardEncryptionKey;
  
     public AuthenticationProtocol(
             RSAPublicKey terminalPubKey,

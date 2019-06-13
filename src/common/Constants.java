@@ -33,6 +33,8 @@ public class Constants {
     public static final short CHALLENGE_TAG_LENGTH = (short) CHALLENGE_TAG.length;
     public static final short SW_INVALID_AMOUNT = (short) 0x000C;
     public static final short SW_INSUFFICIENT_BALANCE = (short) 0x000D;
+    public static final short SW_WRONG_PIN = (short) 0x000E;
+    public static final short SW_BLOCKED = (short) 0x000F;
 
 
 
