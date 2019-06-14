@@ -78,3 +78,5 @@ uninstall:
 init:
 	mkdir bin bin/cap 
 	mkdir src src/${APPLET_PACKAGE} src/${TERMINAL_PACKAGE} 
+
+demo: update-applet setup run-reload-terminal
