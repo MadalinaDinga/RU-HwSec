@@ -261,6 +261,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         }
     }
 
+    /** Starts the protocol required by the terminal */
     private void startProtocol(APDU apdu, byte instructionByte) {
         switch (instructionByte) {
         case Constants.START_AUTHENTICATION_PROTOCOL:
@@ -273,6 +274,7 @@ public class PurseApplet extends Applet implements ISO7816 {
                 break;
             }
 
+            // If PIN reset is required, start the PIN_RESET protocol, otherwise continue with the RELOAD protocol
             if (pin_reset_required) {
                 transientState[STATE_INDEX_CURRENT_PROTOCOL] = PIN_RESET;
                 transientState[STATE_INDEX_STEP] = 0;
@@ -284,20 +286,20 @@ public class PurseApplet extends Applet implements ISO7816 {
             }
             break;
         case Constants.START_PAYMENT_PROTOCOL:
-            if (isAuthenticated()) {
-                transientState[STATE_INDEX_CURRENT_PROTOCOL] = PAYMENT;
-                transientState[STATE_INDEX_STEP] = 0;
-            } else {
+            if (!isAuthenticated()) {
                 ISOException.throwIt(SW_COMMAND_NOT_ALLOWED);
+                break;
             }
+            transientState[STATE_INDEX_CURRENT_PROTOCOL] = PAYMENT;
+            transientState[STATE_INDEX_STEP] = 0;
             break;
-
         default:
             ISOException.throwIt(SW_INS_NOT_SUPPORTED);
         }
         apdu.setOutgoingAndSend((short) 0, (short) 0);
     }
 
+    /** Performs the mutual authentication protocol */
     private void performAuthProtocol(APDU apdu, short len) {
         switch (transientState[STATE_INDEX_STEP]) {
         case 0:
@@ -385,6 +387,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         }
     }
 
+    /** Performs the PIN reset protocol, started at first reload */
     private void performPinResetProtocol(APDU apdu, short len) {
         switch (transientState[STATE_INDEX_STEP]) {
         case 0:
@@ -423,6 +426,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         }
     }
 
+    /** Performs the protocol for reload transactions. */
     private void performReloadProtocol(APDU apdu, short len) {
         switch (transientState[STATE_INDEX_STEP]) {
         case 0:
@@ -483,6 +487,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         }
     }
 
+    /** Performs the protocol for payment transactions. */
     private void performPaymentProtocol(APDU apdu, short len) {
         switch (transientState[STATE_INDEX_STEP]) {
         case 0:
@@ -582,14 +587,17 @@ public class PurseApplet extends Applet implements ISO7816 {
         return true;
     }
 
+    /** Checks whether the card is authenticated */
     private boolean isAuthenticated() {
         return transientState[STATE_INDEX_AUTHENTICATION_STATUS] == AUTHENTICATED;
     }
 
+    /** Changes the authentification state of the card */
     private void setAuthenticated(boolean val) {
         transientState[STATE_INDEX_AUTHENTICATION_STATUS] = (val) ? AUTHENTICATED : NOT_AUTHENTICATED;
     }
 
+    /** Sends the card public key certificate */
     private void send_own_public_key_certificate(APDU apdu) {
         Util.arrayCopy(keyCertificate, (short) 0, apdu.getBuffer(), (short) 0, Constants.CERTIFICATE_LENGTH);
         apdu.setOutgoingAndSend((short) 0 , Constants.CERTIFICATE_LENGTH);
