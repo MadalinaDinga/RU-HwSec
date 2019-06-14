@@ -36,6 +36,8 @@ public class Constants {
     public static final short SW_WRONG_PIN = (short) 0x000E;
     public static final short SW_BLOCKED = (short) 0x000F;
     public static final short SW_WRONG_FORMAT = (short) 0x009;
+    public static final short SW_RESET_PIN = (short) 0x008;
+    public static final byte[] PIN_TAG = new byte[] {0, 1, 0, 2};
 
 
 

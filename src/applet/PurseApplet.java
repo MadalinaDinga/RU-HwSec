@@ -74,9 +74,11 @@ public class PurseApplet extends Applet implements ISO7816 {
                 TAGS
     */
     private final byte[] CHALLENGE_TAG;
+    private final byte[] PIN_TAG;
 
     public PurseApplet() {
         CHALLENGE_TAG = new byte[] {0, 1, 0, 1};
+        PIN_TAG = new byte[] {0, 1, 0, 2};
         // Create buffer
         // tmp = JCSystem.makeTransientByteArray((short)256,JCSystem.CLEAR_ON_DESELECT);
         tmp = JCSystem.makeTransientByteArray((short) 512, JCSystem.CLEAR_ON_DESELECT);
@@ -184,6 +186,8 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 if (pin_reset_required) {
                                     transientState[STATE_INDEX_CURRENT_PROTOCOL] = PIN_RESET;
                                     transientState[STATE_INDEX_STEP] = 0;
+                                    // Notify Reload terminal of PIN_RESET PROTOCOL.
+                                    ISOException.throwIt(Constants.SW_RESET_PIN);
                                 } else {
                                     transientState[STATE_INDEX_CURRENT_PROTOCOL] = RELOAD;
                                     transientState[STATE_INDEX_STEP] = 0;
@@ -292,8 +296,41 @@ public class PurseApplet extends Applet implements ISO7816 {
                         break;
                     case PIN_RESET:
                         // PIN reset protocol
-                        pin_reset_required = false;
-                        clearTransientState();
+                        switch(transientState[STATE_INDEX_STEP]) {
+                            case 0:
+                                Util.arrayCopy(PIN_TAG, (short) 0, tmp, (short) 0, (short) PIN_TAG.length);
+                                offset[0] = (short) PIN_TAG.length;
+                                random.generateData(tmp, offset[0], Constants.CHALLENGE_LENGTH);
+                                offset[0] += Constants.CHALLENGE_LENGTH;
+                                Util.arrayCopy(tmp, (short) PIN_TAG.length, apdu.getBuffer(), (short) 0, Constants.CHALLENGE_LENGTH);
+                                apdu.setOutgoingAndSend((short) 0, Constants.CHALLENGE_LENGTH);
+                                transientState[STATE_INDEX_STEP]++;
+                                break;
+                            case 1:
+                                len = readBuffer(apdu, tmp, offset[0]);
+                                cipher.init(decKey, Cipher.MODE_DECRYPT);
+                                len = cipher.doFinal(tmp, offset[0], len, tmp, offset[0]);
+                                if (len != 4) {
+                                    ISOException.throwIt(SW_DATA_INVALID);
+                                    clearTransientState();
+                                } else {
+                                    offset[0] += 4;
+                                    transientState[STATE_INDEX_STEP]++;
+                                }
+                                break;
+                            case 2:
+                                len = readBuffer(apdu, tmp, offset[0]);
+                                signature.init(otherKey, Signature.MODE_VERIFY);
+                                if (!signature.verify(tmp, (short) 0, offset[0], tmp, offset[0], len)) {
+                                    ISOException.throwIt(SW_DATA_INVALID);
+                                    clearTransientState();
+                                } else {
+                                    pin.update(tmp, (short) (offset[0] - 4), (byte) 4);
+                                    pin_reset_required = false;
+                                    clearTransientState();
+                                }
+                                break;                                
+                        }
                         break;
                     case RELOAD:
                     switch(transientState[STATE_INDEX_STEP]) {

@@ -9,11 +9,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.KeyFactory;
+import java.security.Security;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import javax.smartcardio.CardChannel;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
  *
@@ -25,7 +27,13 @@ public class ReloadGUI extends javax.swing.JFrame {
     private RSAPrivateKey terminalPrivateKey;
     private RSAPublicKey terminalPublicKey;
     private RSAPublicKey masterVerifyKey;
+    private RSAPublicKey cardVerifyKey;
+    private RSAPublicKey cardEncryptionKey;
+    private String pin;
     private byte[] terminalKeyCertificate;
+    boolean reload = true;
+    private CardChannel applet;
+    private ReloadProtocol rp;
     
     /**
      * Creates new form ReloadGUI
@@ -258,32 +266,56 @@ public class ReloadGUI extends javax.swing.JFrame {
 
     private void jButton11ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton11ActionPerformed
         // Accept button
-        try {
-            CardChannel applet = Utils.get();
-            AuthenticationProtocol ap = new AuthenticationProtocol(
-                            terminalPublicKey, terminalPrivateKey,
-                            masterVerifyKey, terminalKeyCertificate);
-            if (ap.run(applet)) {
-                System.out.println("Authenticated.");
-                ReloadProtocol rp = new ReloadProtocol(this, Integer.parseInt(amount),
-                        terminalPublicKey, terminalPrivateKey, ap.cardVerifyKey);
-                if (rp.run(applet)) {
-                    screen.setText("Successfully reloaded the card.");
+        if (reload) {
+            try {
+                applet = Utils.get();
+                AuthenticationProtocol ap = new AuthenticationProtocol(
+                                terminalPublicKey, terminalPrivateKey,
+                                masterVerifyKey, terminalKeyCertificate);
+                
+                
+                
+                if (ap.run(applet)) {
+                    cardVerifyKey = ap.cardVerifyKey;
+                    cardEncryptionKey = ap.cardEncryptionKey;
+                    System.out.println("Authenticated.");
+                    rp = new ReloadProtocol(this, Integer.parseInt(amount),
+                            terminalPublicKey, terminalPrivateKey, ap.cardVerifyKey);
+                    if (rp.run(applet)) {
+                        if (reload) {
+                            screen.setText("Successfully reloaded the card.");
+                        } else {
+                            return;
+                        }
+                    } else {
+                        screen.setText("Failed to reload card.");
+                    } 
                 } else {
-                    screen.setText("Failed to reload card.");
+                    screen.setText("Unauthentic card.\n");
                 }
-            } else {
-                screen.setText("Unauthentic card.\n");
+            } catch (Exception e) {
+                e.printStackTrace();
+                screen.setText("Failed to authenticate with card\n");
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            screen.setText("Failed to authenticate with card\n");
+        } else {
+            
+            PinResetProtocol prp = new PinResetProtocol(this, this.pin, cardEncryptionKey, terminalPrivateKey, cardVerifyKey);
+            if (prp.run(applet)) {
+                rp = new ReloadProtocol(this, Integer.parseInt(amount), 
+                    terminalPublicKey, terminalPrivateKey, cardVerifyKey);
+                if (rp.run(applet)) {
+                        screen.setText("Successfully reloaded the card.");
+                } else {
+                    screen.setText("Failed to reload after setting PIN.");
+                }
+            }
         }
     }//GEN-LAST:event_jButton11ActionPerformed
 
     private void jButton14ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton14ActionPerformed
         // New reload button
         this.amount = "";
+        reload = true;
         screen.setText("Enter reload amount:\n$");
     }//GEN-LAST:event_jButton14ActionPerformed
 
@@ -326,6 +358,8 @@ public class ReloadGUI extends javax.swing.JFrame {
         /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
          * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
          */
+        Security.insertProviderAt(new BouncyCastleProvider(), 1);
+        
         try {
             for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
                 if ("Nimbus".equals(info.getName())) {
@@ -369,9 +403,14 @@ public class ReloadGUI extends javax.swing.JFrame {
     // End of variables declaration//GEN-END:variables
 
     private void numberEntered(String digit) {
-        this.amount += digit;
-        setLastLine("$" + amount);
-        
+        if (reload) {
+            this.amount += digit;
+            setLastLine("$" + amount);
+        } else {
+            this.pin += digit;
+            setLastLine("-> " + String.join("", java.util.Collections.nCopies(pin.length(), "*")));
+        }
+
     }
     
     private void setLastLine(String newText) {
@@ -394,5 +433,13 @@ public class ReloadGUI extends javax.swing.JFrame {
         in.read(data);
         in.close();
         return data;
+    }
+    
+    public void pinReset() {
+        reload = false;
+        pin = "";
+        screen.append("\nYou first need to set your pincode.\n");
+        screen.append("Enter your pin\n->");
+        
     }
 }

@@ -28,6 +28,7 @@ public class ReloadProtocol extends Protocol {
     private final RSAPublicKey cardVerifyKey;
     private final int amount;
     public byte[] proofOfReload;
+    public boolean resetPin = false;
     
     public ReloadProtocol(ReloadGUI gui,
             int amount,
@@ -50,8 +51,18 @@ public class ReloadProtocol extends Protocol {
         
         try {
             // Signal start of the protocol
-            rapdu = sendCommand(applet, startReload(), 0x9000, "Start authentication message returned SW: ");
-        
+            try {
+                rapdu = sendCommand(applet, startReload(), 0x9000, "Start authentication message returned SW: ");
+            } catch (Exception e) {
+                if (e.getMessage().contains("" + Constants.SW_RESET_PIN)) {
+                    System.out.println("First set pin.");
+                    gui.pinReset();
+                    return true;
+                } else {
+                    throw e;
+                }
+            }
+            
             // Send the amount
             ByteBuffer buff = ByteBuffer.allocate(2);
             buff.putShort((short) amount);
