@@ -40,14 +40,25 @@ public class CLI {
 
     public static void main(String[] args) {
         Security.insertProviderAt(new BouncyCastleProvider(), 1);
+        
         CLI cli = new CLI();
-        System.out.println("Start generating keys.");
-        cli.generateMasterKeys();
-        cli.generatePoSKeyMaterial();
-        cli.generateReloadKeyMaterial();
-        System.out.println("Initialize card");
-        cli.initializeCard();
-        System.out.println("Done.");
+        if (args.length == 0) {
+            System.out.println("Start generating keys.");
+            cli.generateMasterKeys();
+            cli.generatePoSKeyMaterial();
+            cli.generateReloadKeyMaterial();
+            System.out.println("Initialize card");
+            cli.initializeCard();
+            System.out.println("Done.");
+        } else if (args.length == 1) {
+            cli.loadMasterKeys();
+            if (args[1].equals("issue")) {
+                cli.initializeCard();
+            } else if (args[1].equals("generate")) {
+                cli.generatePoSKeyMaterial();;
+                cli.generateReloadKeyMaterial();
+            }
+        }
     }
     
     private RSAPublicKey masterPublicKey;

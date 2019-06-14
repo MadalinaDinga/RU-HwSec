@@ -120,7 +120,7 @@ public class PurseApplet extends Applet implements ISO7816 {
         tmp[0] = tmp[1] = tmp[2] = tmp[3] = 0;
         pin.update(tmp, (short) 0, (byte) 4);
         pin_reset_required = true;
-
+        clearTransientState();
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
@@ -327,7 +327,7 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 } else {
                                     pin.update(tmp, (short) (offset[0] - 4), (byte) 4);
                                     pin_reset_required = false;
-                                    clearTransientState();
+                                    transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
                                 }
                                 break;                                
                         }
@@ -378,11 +378,11 @@ public class PurseApplet extends Applet implements ISO7816 {
                                 balance += Util.makeShort(tmp[0], tmp[1]); 
                                 apdu.setOutgoingAndSend((short) 0, len);
                                 transactionCounter++;
-                                clearTransientState();
                             } else {
                                 clearTransientState();
                                 ISOException.throwIt(SW_DATA_INVALID);
                             }
+                            clearTransientState();
                         }
                     break;
                     case PAYMENT:
@@ -536,7 +536,6 @@ public class PurseApplet extends Applet implements ISO7816 {
      * signature on the current value of <code>otherKey</code>.
      * @param apdu
      * @return true if certificate is valid, false otherwise.
-     * @throws SW_DATA_INVALID if signature is incorrect.
      */
     private boolean verifyCertificate(APDU apdu) {
         signature.init(masterVerifyKey, Signature.MODE_VERIFY);

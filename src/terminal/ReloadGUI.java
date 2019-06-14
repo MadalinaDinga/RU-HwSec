@@ -273,8 +273,6 @@ public class ReloadGUI extends javax.swing.JFrame {
                                 terminalPublicKey, terminalPrivateKey,
                                 masterVerifyKey, terminalKeyCertificate);
                 
-                
-                
                 if (ap.run(applet)) {
                     cardVerifyKey = ap.cardVerifyKey;
                     cardEncryptionKey = ap.cardEncryptionKey;
@@ -340,7 +338,7 @@ public class ReloadGUI extends javax.swing.JFrame {
                 terminalKeyCertificate = readFile("reload-certificate");
                 
             } else {
-                System.err.println("No keys available for pos terminal.");
+                System.err.println("No keys available for reload terminal.");
             }
         } catch (Exception ioe) {
             System.err.println("Failed to load keys.");
