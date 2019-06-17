@@ -6,6 +6,9 @@
 package terminal;
 
 import common.Constants;
+import common.Logger;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.Signature;
 
@@ -29,6 +32,7 @@ public class ReloadProtocol extends Protocol {
     private final int amount;
     public byte[] proofOfReload;
     public boolean resetPin = false;
+    private Logger log;
     
     public ReloadProtocol(ReloadGUI gui,
             int amount,
@@ -40,6 +44,12 @@ public class ReloadProtocol extends Protocol {
         this.terminalPublicKey = terminalPubKey;
         this.terminalPrivateKey = terminalPrivateKey;
         this.cardVerifyKey = cardVerifyKey;
+        try {
+            this.log = new Logger();
+        } catch (IOException e) {
+            System.out.println("Failed to initialize logger: " + e.getMessage());
+            System.exit(1);
+        }
     }
     
     /**
@@ -101,10 +111,27 @@ public class ReloadProtocol extends Protocol {
             
             this.proofOfReload = proofOfReload;
             
+            // Log reload transaction to ensure non-repudiation
+            if (!logTransaction(amount, cardVerifyKey, terminalPublicKey, proofOfReload, nonce, cardNonce)) {
+                return false;
+            }
+            
             System.out.println("Valid transaction.");
             
         } catch (CardException e) {
             e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
+    private boolean logTransaction(int amount, RSAPublicKey cardPublicKey,
+    RSAPublicKey terminalPublicKey, byte[] proofOfReload,
+    byte[] terminalNonce, byte[] cardNonce) {
+        try {
+            log.writeReload(amount, cardVerifyKey, terminalPublicKey, proofOfReload, terminalNonce, cardNonce);
+        } catch (IOException e) {
+            System.out.println("Logging the transaction failed: " + e.getMessage());
             return false;
         }
         return true;

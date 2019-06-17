@@ -6,6 +6,9 @@
 package terminal;
 
 import common.Constants;
+import common.Logger;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.security.Signature;
@@ -23,7 +26,7 @@ import javax.smartcardio.ResponseAPDU;
  * @author tom
  */
 public class PaymentProtocol extends Protocol {
-    
+
     private final PoSTerminalGUI gui;
     private final RSAPrivateKey terminalPrivateKey;
     private final RSAPublicKey terminalPublicKey;
@@ -32,24 +35,26 @@ public class PaymentProtocol extends Protocol {
     public byte[] proofOfPayment;
     private final RSAPublicKey cardEncryptionKey;
     private boolean retry = false;
-    
+
     private byte[] amountBytes;
     private byte[] nonce;
     private byte[] cardNonce;
-    
-    
-    public PaymentProtocol(PoSTerminalGUI gui,
-            int amount,
-            RSAPublicKey terminalPubKey,
-            RSAPrivateKey terminalPrivateKey,
-            RSAPublicKey cardVerifyKey,
-            RSAPublicKey cardEncryptionKey) {
+    private Logger log;
+
+    public PaymentProtocol(PoSTerminalGUI gui, int amount, RSAPublicKey terminalPubKey,
+            RSAPrivateKey terminalPrivateKey, RSAPublicKey cardVerifyKey, RSAPublicKey cardEncryptionKey) {
         this.gui = gui;
         this.amount = amount;
         this.terminalPublicKey = terminalPubKey;
         this.terminalPrivateKey = terminalPrivateKey;
         this.cardVerifyKey = cardVerifyKey;
         this.cardEncryptionKey = cardEncryptionKey;
+        try {
+            this.log = new Logger();
+        } catch (IOException e) {
+            System.out.println("Failed to initialize logger: " + e.getMessage());
+            System.exit(1);
+        }
     }
     
     /**
@@ -143,10 +148,28 @@ public class PaymentProtocol extends Protocol {
             
             this.proofOfPayment = proofOfPayment;
             
+            // Log reload transaction to ensure non-repudiation
+            if (!logTransaction(amount, cardVerifyKey, terminalPublicKey, proofOfPayment, nonce, cardNonce)) {
+                return false;
+            }
+            
             System.out.println("Valid transaction.");
             
         } catch (CardException e) {
             e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
+    private boolean logTransaction(int amount, RSAPublicKey cardPublicKey,
+    RSAPublicKey terminalPublicKey, byte[] proofOfPayment,
+    byte[] terminalNonce, byte[] cardNonce) {
+        
+        try {
+            log.writePayment(amount, cardVerifyKey, terminalPublicKey, proofOfPayment, terminalNonce, cardNonce);
+        } catch (IOException e) {
+            System.out.println("Logging the transaction failed: " + e.getMessage());
             return false;
         }
         return true;

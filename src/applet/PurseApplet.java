@@ -170,9 +170,9 @@ public class PurseApplet extends Applet implements ISO7816 {
         // The card is in an uninitialized state until it goes through the initialization protocol (i.e.,
         // personalization) - CLI
         persistentState = STATE_INIT;
-        // No balance on card until first reload
+        // No balance on card until first reload.
         balance = 0;
-        // Should increase after every successfully performed transaction
+        // Should increase after every successfully performed transaction.
         transactionCounter = 0;
     }
 
@@ -180,9 +180,11 @@ public class PurseApplet extends Applet implements ISO7816 {
      * Set default PIN code to 0 0 0 0
      */
     private void setDefaultPIN() {
+        // Construct PIN code with try limit set to 3 and maximum PIN size 4.
         pin = new OwnerPIN((byte) 3, (byte) 4);
         tmp[0] = tmp[1] = tmp[2] = tmp[3] = 0;
         pin.update(tmp, (short) 0, (byte) 4);
+        // The PIN needs to be reset before being able to reload.
         pin_reset_required = true;
     }
 
@@ -471,11 +473,13 @@ public class PurseApplet extends Applet implements ISO7816 {
                 signature.init(privKey, Signature.MODE_SIGN);
                 len = signature.sign(tmp, (short) 0, (short) (offset[0] + modOff + expOff), apdu.getBuffer(),
                         (short) 0);
-                // Increase balance by given amount.
+                
                 short amount = Util.makeShort(tmp[0], tmp[1]);
+                // Validate amount.
                 if (!isValidAmount(amount)) {
                     ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
                 }
+                // Increase balance by given amount.
                 balance += amount;
                 apdu.setOutgoingAndSend((short) 0, len);
                 transactionCounter++;
@@ -561,11 +565,13 @@ public class PurseApplet extends Applet implements ISO7816 {
                 signature.init(privKey, Signature.MODE_SIGN);
                 len = signature.sign(tmp, (short) 0, (short) (offset[0] + modOff + expOff), apdu.getBuffer(),
                         (short) 0);
-                // Decrease balance by given amount.
+                
                 short amount = Util.makeShort(tmp[0], tmp[1]);
+                // Validate amount.
                 if (!isValidAmount(amount)) {
                     ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
                 }
+                // Decrease balance by given amount.
                 balance -= amount;
                 apdu.setOutgoingAndSend((short) 0, len);
                 transactionCounter++;

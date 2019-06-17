@@ -3,7 +3,7 @@ package common;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import javacard.security.RSAPublicKey;
+import java.security.interfaces.RSAPublicKey;
 
 
 public class Logger {
@@ -15,15 +15,35 @@ public class Logger {
         reloadLogPW = new PrintWriter(new FileWriter("reload-log", true)); 
     }
 
-    public void writePayment(short amount, RSAPublicKey cardPublicKey, RSAPublicKey terminalPublicKey, byte[] proofOfPayment) {
+    /** Write payment transaction to payment log file */
+    public void writePayment(int amount, RSAPublicKey cardPublicKey,
+            RSAPublicKey terminalPublicKey, byte[] proofOfPayment,
+            byte[] terminalNonce, byte[] cardNonce) throws IOException {
         long timestamp = System.currentTimeMillis();
-        paymentLogPW.println(timestamp+"; "+terminalPublicKey+"; "+cardPublicKey+"; "+amount+"; "+proofOfPayment+"\n");
+        // Write to payment log file
+        paymentLogPW.println("P; "+timestamp+"; "+terminalPublicKey+"; "+cardPublicKey+"; "+amount+"; "
+        +proofOfPayment+"; "+terminalNonce+"; "+cardNonce+"\n");
+
+        // Check error state
+        if (paymentLogPW.checkError()) {
+            throw new IOException();
+        }
         paymentLogPW.close();
     }
 
-    public void writeReload(short amount, RSAPublicKey cardPublicKey, RSAPublicKey terminalPublicKey, byte[] proofOfPayment) {
+    /** Write reload transaction to reload log file */
+    public void writeReload(int amount, RSAPublicKey cardPublicKey,
+        RSAPublicKey terminalPublicKey, byte[] proofOfPayment,
+        byte[] terminalNonce, byte[] cardNonce) throws IOException {
         long timestamp = System.currentTimeMillis();
-        reloadLogPW.println(timestamp+"; "+terminalPublicKey+"; "+cardPublicKey+"; "+amount+"; "+proofOfPayment+"\n");
+        // Write to reload log file
+        reloadLogPW.println("R; "+timestamp+"; "+terminalPublicKey+"; "+cardPublicKey+"; "+amount+"; "
+        +proofOfPayment+"; "+terminalNonce+"; "+cardNonce+"\n");
+
+        // Check error state
+        if (paymentLogPW.checkError()) {
+            throw new IOException();
+        }
         reloadLogPW.close();
     }
 
