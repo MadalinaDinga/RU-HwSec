@@ -87,7 +87,9 @@ public class ReloadProtocol extends Protocol {
             byte[] cardNonce = rapdu.getData();
         
             // Send nonce to the card
-            byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];  
+            byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];   
+            SecureRandom random = new SecureRandom();
+            random.nextBytes(nonce);
             
             rapdu = sendCommand(applet, nonce(nonce), 0x9000, "Sending over the nonce resulted in SW: ");
             byte[] signature = rapdu.getData();
