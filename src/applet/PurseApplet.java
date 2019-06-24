@@ -524,10 +524,10 @@ public class PurseApplet extends Applet implements ISO7816 {
             offset[0] = (short) PAYMENT_TAG.length;
             
             // TMP contents:: PAYMENT_TAG, Amount
-            len = readBuffer(apdu, tmp, (short) 0);
+            len = readBuffer(apdu, tmp, offset[0]);
             offset[0] += len;
 
-            if (offset[0] > (short) ((short) PAYMENT_TAG.length + (short) 2) || offset[0] < 0) {
+            if (offset[0] > (short) ((short) PAYMENT_TAG.length + (short) 2) || offset[0] < PAYMENT_TAG.length) {
                 ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
                 clearTransientState();
             } else if (Util.makeShort(tmp[0], tmp[1]) > balance) {
@@ -537,10 +537,9 @@ public class PurseApplet extends Applet implements ISO7816 {
             
             Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
             random.generateData(apdu.getBuffer(), (short) 2, Constants.CHALLENGE_LENGTH);
-            offset[0] += Constants.CHALLENGE_LENGTH + (short) 2;
             // TMP contents:: PAYMENT_TAG,Amount, transactionCounter, nonce
-            Util.arrayCopy(apdu.getBuffer(), (short) 0, tmp, (short) 2, offset[0]);
-
+            Util.arrayCopy(apdu.getBuffer(), (short) 0, tmp, offset[0], (short) (2 + Constants.CHALLENGE_LENGTH));
+            offset[0] += (short) (2 + Constants.CHALLENGE_LENGTH);
             apdu.setOutgoingAndSend((short) 0, (short) (2 + Constants.CHALLENGE_LENGTH));
             transientState[STATE_INDEX_STEP]++;
         
@@ -560,7 +559,7 @@ public class PurseApplet extends Applet implements ISO7816 {
             cipher.init(decKey, Cipher.MODE_DECRYPT);
             len = cipher.doFinal(tmp, offset[0], len, tmp, offset[0]);
             // Check if the encryption is fresh
-            byte nonceOk = Util.arrayCompare(tmp, (short) (offset[0] + 4 + 2), tmp, (short) 4,
+            byte nonceOk = Util.arrayCompare(tmp, (short) (offset[0] + 4 + 2), tmp, (short) (PAYMENT_TAG.length + 4),
                     Constants.CHALLENGE_LENGTH);
             if (pin.check(tmp, (short) (offset[0]), (byte) 4) && nonceOk == 0) {
                 transientState[STATE_INDEX_STEP]++;

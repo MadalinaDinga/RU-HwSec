@@ -75,7 +75,7 @@ public class PaymentProtocol extends Protocol {
                 // Send the amount
                 ByteBuffer buff = ByteBuffer.allocate(2);
                 buff.putShort((short) amount);
-               amountBytes = buff.array();
+                amountBytes = buff.array();
 
                 try {
                     rapdu = sendCommand(applet, amount(amountBytes), 0x9000, "Sending over the amount resulted in SW: ");
