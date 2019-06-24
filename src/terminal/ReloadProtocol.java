@@ -156,7 +156,7 @@ public class ReloadProtocol extends Protocol {
         try {
             Signature sig = Signature.getInstance("SHA1withRSA");
             sig.initVerify(cardVerifyKey);
-            
+            sig.update(Constants.RELOAD_TAG);
             sig.update(amount);
             sig.update(tNonce);
             sig.update(cNonce);
@@ -174,7 +174,7 @@ public class ReloadProtocol extends Protocol {
         try {
             Signature sig = Signature.getInstance("SHA1withRSA");
             sig.initVerify(cardVerifyKey);
-
+            sig.update(Constants.RELOAD_TAG);
             sig.update(amount);
             sig.update(nonce);
             sig.update(counter);
