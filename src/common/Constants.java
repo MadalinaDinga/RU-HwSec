@@ -51,5 +51,4 @@ public class Constants {
     public static final byte[] PAYMENT_TAG = new byte[] {0, 1, 0, 3};
     public static final byte[] RELOAD_TAG = new byte[] {0, 1, 0, 4};
 
-
 }

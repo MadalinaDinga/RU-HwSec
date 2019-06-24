@@ -456,7 +456,7 @@ public class PurseApplet extends Applet implements ISO7816 {
             offset[0] = (short) RELOAD_TAG.length;
 
             // TMP contents:: RELOAD_TAG, Amount
-            len = readBuffer(apdu, tmp, (short) 0);
+            len = readBuffer(apdu, tmp, offset[0]);
             offset[0] += len;
 
             if (offset[0] > (short) ((short) RELOAD_TAG.length + (short) 2) || offset[0] < 0) {
