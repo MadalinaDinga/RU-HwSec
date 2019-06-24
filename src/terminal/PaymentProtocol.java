@@ -93,7 +93,8 @@ public class PaymentProtocol extends Protocol {
 
                 // Send nonce to the card
                 SecureRandom random = new SecureRandom();
-                nonce = new byte[Constants.CHALLENGE_LENGTH];  
+                nonce = new byte[Constants.CHALLENGE_LENGTH];
+                random.nextBytes(nonce);
 
                 rapdu = sendCommand(applet, nonce(nonce), 0x9000, "Sending over the nonce resulted in SW: ");
                 byte[] signature = rapdu.getData();

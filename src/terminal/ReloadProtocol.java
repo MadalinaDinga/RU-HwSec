@@ -10,6 +10,7 @@ import common.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.security.Signature;
 
 import java.security.interfaces.RSAPrivateKey;
@@ -87,7 +88,9 @@ public class ReloadProtocol extends Protocol {
             byte[] cardNonce = rapdu.getData();
         
             // Send nonce to the card
-            byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];  
+            SecureRandom random = new SecureRandom();
+            byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];
+            random.nextBytes(nonce);
             
             rapdu = sendCommand(applet, nonce(nonce), 0x9000, "Sending over the nonce resulted in SW: ");
             byte[] signature = rapdu.getData();
