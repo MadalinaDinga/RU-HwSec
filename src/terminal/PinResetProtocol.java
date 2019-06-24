@@ -53,6 +53,7 @@ public class PinResetProtocol extends Protocol {
             pinBytes[i] = (byte) Integer.parseInt("" + pin.toCharArray()[i]);
         }
         try {
+            // Retrieve card nonce
             rapdu = sendCommand(applet, getNonce(), 0x9000, "Retrieving nonce resulted in SW: ");
             byte[] nonce = rapdu.getData();
             
@@ -60,16 +61,19 @@ public class PinResetProtocol extends Protocol {
             System.out.println(cardEncryptionKey);
             cipher.init(Cipher.ENCRYPT_MODE, cardEncryptionKey);
             cipher.update(pinBytes);
+            // Encrypt PIN
             byte[] encPin = cipher.doFinal();
-            
+            // Send encrypted PIN
             rapdu = sendCommand(applet, pin(encPin), 0x9000, "Sending encrypted pin resulted in SW: ");
+
+            // Prepare signature
             Signature signature = Signature.getInstance("SHA1withRSA");
             signature.initSign(terminalPrivateKey);
             signature.update(Constants.PIN_TAG);
             signature.update(nonce);
             signature.update(pinBytes);
             byte[] sig = signature.sign();
-            
+            // Send signature
             rapdu = sendCommand(applet, pinSignature(sig), 0x9000, "Sending signature over pin resulted in SW: ");
             
         } catch (Exception e) {

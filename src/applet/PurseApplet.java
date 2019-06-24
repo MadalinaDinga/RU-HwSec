@@ -393,6 +393,7 @@ public class PurseApplet extends Applet implements ISO7816 {
     private void performPinResetProtocol(APDU apdu, short len) {
         switch (transientState[STATE_INDEX_STEP]) {
         case 0:
+            // TMP: pin, nonce
             Util.arrayCopy(PIN_TAG, (short) 0, tmp, (short) 0, (short) PIN_TAG.length);
             offset[0] = (short) PIN_TAG.length;
             random.generateData(tmp, offset[0], Constants.CHALLENGE_LENGTH);
@@ -402,6 +403,7 @@ public class PurseApplet extends Applet implements ISO7816 {
             transientState[STATE_INDEX_STEP]++;
             break;
         case 1:
+            // Receive and decrypt PIN 
             len = readBuffer(apdu, tmp, offset[0]);
             cipher.init(decKey, Cipher.MODE_DECRYPT);
             len = cipher.doFinal(tmp, offset[0], len, tmp, offset[0]);
@@ -414,16 +416,20 @@ public class PurseApplet extends Applet implements ISO7816 {
             }
             break;
         case 2:
+            // Receive signature
             len = readBuffer(apdu, tmp, offset[0]);
             signature.init(otherKey, Signature.MODE_VERIFY);
+            // Verify signature and throw exception if it fails
             if (!signature.verify(tmp, (short) 0, offset[0], tmp, offset[0], len)) {
                 ISOException.throwIt(SW_DATA_INVALID);
                 clearTransientState();
-            } else {
-                pin.update(tmp, (short) (offset[0] - 4), (byte) 4);
-                pin_reset_required = false;
-                transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
-            }
+                break;
+            } 
+            // Reset PIN, if signature verification successful
+            pin.update(tmp, (short) (offset[0] - 4), (byte) 4);
+            // Change internal state of the card (pin reset flag to false)
+            pin_reset_required = false;
+            transientState[STATE_INDEX_CURRENT_PROTOCOL] = NO_PROTOCOL;
             break;
         }
     }
