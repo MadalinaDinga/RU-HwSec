@@ -94,6 +94,9 @@ public class PurseApplet extends Applet implements ISO7816 {
      */
     private final byte[] CHALLENGE_TAG;
     private final byte[] PIN_TAG;
+    public final byte[] PAYMENT_TAG;
+    public final byte[] RELOAD_TAG;
+
 
     public PurseApplet() {
         // Initialize transient/persistent memory
@@ -113,6 +116,9 @@ public class PurseApplet extends Applet implements ISO7816 {
         // Initialize signing tags
         CHALLENGE_TAG = new byte[] { 0, 1, 0, 1 };
         PIN_TAG = new byte[] { 0, 1, 0, 2 };
+        PAYMENT_TAG = new byte[] {0, 1, 0, 3};
+        RELOAD_TAG = new byte[] {0, 1, 0, 4};
+    
 
         clearTransientState();
     }
@@ -393,9 +399,10 @@ public class PurseApplet extends Applet implements ISO7816 {
     private void performPinResetProtocol(APDU apdu, short len) {
         switch (transientState[STATE_INDEX_STEP]) {
         case 0:
-            // TMP: pin, nonce
+            // TMP: PIN_TAG
             Util.arrayCopy(PIN_TAG, (short) 0, tmp, (short) 0, (short) PIN_TAG.length);
             offset[0] = (short) PIN_TAG.length;
+            // TMP: PIN_TAG, nonce
             random.generateData(tmp, offset[0], Constants.CHALLENGE_LENGTH);
             offset[0] += Constants.CHALLENGE_LENGTH;
             Util.arrayCopy(tmp, (short) PIN_TAG.length, apdu.getBuffer(), (short) 0, Constants.CHALLENGE_LENGTH);
@@ -403,6 +410,7 @@ public class PurseApplet extends Applet implements ISO7816 {
             transientState[STATE_INDEX_STEP]++;
             break;
         case 1:
+            // TMP: PIN_TAG, nonce, PIN
             // Receive and decrypt PIN 
             len = readBuffer(apdu, tmp, offset[0]);
             cipher.init(decKey, Cipher.MODE_DECRYPT);
@@ -443,9 +451,13 @@ public class PurseApplet extends Applet implements ISO7816 {
                 clearTransientState();
                 break;
             }
-            // TMP contents:: Amount
+            // TMP contents:: RELOAD_TAG
+            Util.arrayCopy(RELOAD_TAG, (short) 0, tmp, (short) 0, (short) RELOAD_TAG.length);
+            offset[0] = (short) RELOAD_TAG.length;
+
+            // TMP contents:: RELOAD_TAG, Amount
             len = readBuffer(apdu, tmp, (short) 0);
-            offset[0] = len;
+            offset[0] += len;
 
             if (offset[0] > 2 || offset[0] < 0) {
                 ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
@@ -458,9 +470,9 @@ public class PurseApplet extends Applet implements ISO7816 {
 
             break;
         case 1:
-            // TMP contents:: Amount, nonce_t
+            // TMP contents:: RELOAD_TAG, Amount, nonce_t
             offset[0] += readBuffer(apdu, tmp, offset[0]);
-            // TMP contents:: Amount, nonce_t, transactionCounter
+            // TMP contents:: RELOAD_TAG, Amount, nonce_t, transactionCounter
             Util.setShort(tmp, (short) (offset[0]), transactionCounter);
             offset[0] += 2;
 
@@ -504,31 +516,36 @@ public class PurseApplet extends Applet implements ISO7816 {
             if (!isAuthenticated()) {
                 ISOException.throwIt(SW_SECURITY_STATUS_NOT_SATISFIED);
                 clearTransientState();
-            } else {
-                // TMP contents:: Amount
-                len = readBuffer(apdu, tmp, (short) 0);
-                offset[0] = len;
+                break;
+            } 
+            // TMP contents:: PAYMENT_TAG
+            Util.arrayCopy(PAYMENT_TAG, (short) 0, tmp, (short) 0, (short) PAYMENT_TAG.length);
+            offset[0] = (short) PAYMENT_TAG.length;
+            
+            // TMP contents:: PAYMENT_TAG, Amount
+            len = readBuffer(apdu, tmp, (short) 0);
+            offset[0] += len;
 
-                if (offset[0] > 2 || offset[0] < 0) {
-                    ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
-                    clearTransientState();
-                } else if (Util.makeShort(tmp[0], tmp[1]) > balance) {
-                    clearTransientState();
-                    ISOException.throwIt(Constants.SW_INSUFFICIENT_BALANCE);
-                }
-
-                Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
-                random.generateData(apdu.getBuffer(), (short) 2, Constants.CHALLENGE_LENGTH);
-                offset[0] += Constants.CHALLENGE_LENGTH + (short) 2;
-                // TMP contents:: Amount, transactionCounter, nonce
-                Util.arrayCopy(apdu.getBuffer(), (short) 0, tmp, (short) 2, offset[0]);
-
-                apdu.setOutgoingAndSend((short) 0, (short) (2 + Constants.CHALLENGE_LENGTH));
-                transientState[STATE_INDEX_STEP]++;
+            if (offset[0] > 2 || offset[0] < 0) {
+                ISOException.throwIt(Constants.SW_INVALID_AMOUNT);
+                clearTransientState();
+            } else if (Util.makeShort(tmp[0], tmp[1]) > balance) {
+                clearTransientState();
+                ISOException.throwIt(Constants.SW_INSUFFICIENT_BALANCE);
             }
+
+            Util.setShort(apdu.getBuffer(), (short) 0, transactionCounter);
+            random.generateData(apdu.getBuffer(), (short) 2, Constants.CHALLENGE_LENGTH);
+            offset[0] += Constants.CHALLENGE_LENGTH + (short) 2;
+            // TMP contents:: PAYMENT_TAG, Amount, transactionCounter, nonce
+            Util.arrayCopy(apdu.getBuffer(), (short) 0, tmp, (short) 2, offset[0]);
+
+            apdu.setOutgoingAndSend((short) 0, (short) (2 + Constants.CHALLENGE_LENGTH));
+            transientState[STATE_INDEX_STEP]++;
+        
             break;
         case 1:
-            // TMP contents:: Amount, transactionCounter, nonce, nonce_t
+            // TMP contents:: PAYMENT_TAG, Amount, transactionCounter, nonce, nonce_t
             offset[0] += readBuffer(apdu, tmp, offset[0]);
 
             signature.init(privKey, Signature.MODE_SIGN);

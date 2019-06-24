@@ -89,7 +89,6 @@ public class ReloadProtocol extends Protocol {
             // Send nonce to the card
             byte[] nonce = new byte[Constants.CHALLENGE_LENGTH];  
             
-            //TODO: add tag
             rapdu = sendCommand(applet, nonce(nonce), 0x9000, "Sending over the nonce resulted in SW: ");
             byte[] signature = rapdu.getData();
             
@@ -197,7 +196,7 @@ public class ReloadProtocol extends Protocol {
         try {
             Signature sig = Signature.getInstance("SHA1withRSA");
             sig.initSign(terminalPrivateKey);
-
+            sig.update(Constants.RELOAD_TAG);
             sig.update(amount);
             sig.update(nonce);
             sig.update(counter);

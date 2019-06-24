@@ -239,7 +239,7 @@ public class PaymentProtocol extends Protocol {
         try {
             Signature sig = Signature.getInstance("SHA1withRSA");
             sig.initSign(terminalPrivateKey);
-
+            sig.update(Constants.PAYMENT_TAG);
             sig.update(amount);
             sig.update(counter);
             sig.update(nonce);
